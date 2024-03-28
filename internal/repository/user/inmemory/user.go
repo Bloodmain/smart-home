@@ -37,10 +37,17 @@ func (r *UserRepository) GetUserByID(ctx context.Context, id int64) (*domain.Use
 
 	go func() {
 		r.m.RLock()
+	outer:
 		for _, v := range r.storage {
-			if v.ID == id {
-				found <- v
-				break
+			select {
+			case <-ctx.Done():
+				break outer
+			default:
+
+				if v.ID == id {
+					found <- v
+					break
+				}
 			}
 		}
 		r.m.RUnlock()

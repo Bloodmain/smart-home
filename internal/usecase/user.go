@@ -47,13 +47,19 @@ func (u *User) GetUserSensors(ctx context.Context, userID int64) ([]domain.Senso
 	s := make([]domain.Sensor, 0, len(sOwners))
 
 	go func() {
+	outer:
 		for _, so := range sOwners {
-			sensor, err := u.sr.GetSensorByID(ctx, so.SensorID)
-			if err != nil {
-				e <- err
-				return
+			select {
+			case <-ctx.Done():
+				break outer
+			default:
+				sensor, err := u.sr.GetSensorByID(ctx, so.SensorID)
+				if err != nil {
+					e <- err
+					return
+				}
+				s = append(s, *sensor)
 			}
-			s = append(s, *sensor)
 		}
 		done <- struct{}{}
 	}()
