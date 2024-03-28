@@ -28,9 +28,15 @@ func (r *SensorOwnerRepository) GetSensorsByUserID(ctx context.Context, userID i
 
 	go func() {
 		r.m.RLock()
+	outer:
 		for _, v := range r.storage {
-			if v.UserID == userID {
-				sensors = append(sensors, v)
+			select {
+			case <-ctx.Done():
+				break outer
+			default:
+				if v.UserID == userID {
+					sensors = append(sensors, v)
+				}
 			}
 		}
 		r.m.RUnlock()
