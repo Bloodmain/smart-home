@@ -9,6 +9,9 @@ const (
 	SensorTypeADC            SensorType = "adc"
 )
 
+// AcceptableSensorTypes В самом деле нет более адекватного способа проверить, что нам передали допустимый тип, чем засунуть все константы в мапу?😐
+var AcceptableSensorTypes = map[SensorType]struct{}{SensorTypeADC: {}, SensorTypeContactClosure: {}}
+
 // Sensor - структура для хранения данных датчика
 type Sensor struct {
 	ID           int64
