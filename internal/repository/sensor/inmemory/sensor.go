@@ -18,6 +18,10 @@ type SensorRepository struct {
 	m       sync.RWMutex
 }
 
+/*
+ Код всех классов inmemory очень похож, но идей, как вынести общий код без дженериков/темплейтов, нет :(
+*/
+
 func NewSensorRepository() *SensorRepository {
 	return &SensorRepository{storage: []*domain.Sensor{}, m: sync.RWMutex{}}
 }
@@ -39,8 +43,14 @@ func (r *SensorRepository) GetSensors(ctx context.Context) ([]domain.Sensor, err
 
 	go func() {
 		r.m.RLock()
+	outer:
 		for _, v := range r.storage {
-			sensors = append(sensors, *v)
+			select {
+			case <-ctx.Done():
+				break outer
+			default:
+				sensors = append(sensors, *v)
+			}
 		}
 		r.m.RUnlock()
 		done <- struct{}{}
@@ -72,10 +82,16 @@ func (r *SensorRepository) getSensorBy(ctx context.Context, p func(sensor *domai
 
 	go func() {
 		r.m.RLock()
+	outer:
 		for _, v := range r.storage {
-			if p(v) {
-				found <- v
-				break
+			select {
+			case <-ctx.Done():
+				break outer
+			default:
+				if p(v) {
+					found <- v
+					break
+				}
 			}
 		}
 		r.m.RUnlock()
