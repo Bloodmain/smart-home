@@ -38,7 +38,6 @@ func (s *Sensor) RegisterSensor(ctx context.Context, sensor *domain.Sensor) (*do
 	}
 	old, err := s.sensorRepository.GetSensorBySerialNumber(ctx, sensor.SerialNumber)
 	if err != nil {
-		// Неужели надо чекать на ошибку, которая объявлена на более высоком уровне? А как же инверсия зависимостей :(
 		if errors.Is(err, inmemory.ErrSensorNotFound) {
 			if err = s.sensorRepository.SaveSensor(ctx, sensor); err != nil {
 				return nil, err
