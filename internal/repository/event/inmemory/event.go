@@ -12,14 +12,16 @@ var (
 	ErrNilEventPointer = errors.New("nil event is provided")
 )
 
+type SensorId int64
+
 type EventRepository struct {
 	// maps sensor's id to its last event
-	lastEvent map[int64]*domain.Event
+	lastEvent map[SensorId]*domain.Event
 	m         sync.RWMutex
 }
 
 func NewEventRepository() *EventRepository {
-	return &EventRepository{lastEvent: map[int64]*domain.Event{}, m: sync.RWMutex{}}
+	return &EventRepository{lastEvent: map[SensorId]*domain.Event{}, m: sync.RWMutex{}}
 }
 
 func (r *EventRepository) SaveEvent(ctx context.Context, event *domain.Event) error {
@@ -27,9 +29,9 @@ func (r *EventRepository) SaveEvent(ctx context.Context, event *domain.Event) er
 		return ErrNilEventPointer
 	}
 	r.m.Lock()
-	now, has := r.lastEvent[event.SensorID]
+	now, has := r.lastEvent[SensorId(event.SensorID)]
 	if !has || event.Timestamp.After(now.Timestamp) {
-		r.lastEvent[event.SensorID] = event
+		r.lastEvent[SensorId(event.SensorID)] = event
 	}
 	r.m.Unlock()
 	return ctx.Err()
@@ -37,7 +39,7 @@ func (r *EventRepository) SaveEvent(ctx context.Context, event *domain.Event) er
 
 func (r *EventRepository) GetLastEventBySensorID(ctx context.Context, id int64) (*domain.Event, error) {
 	r.m.RLock()
-	event, has := r.lastEvent[id]
+	event, has := r.lastEvent[SensorId(id)]
 	r.m.RUnlock()
 	if !has {
 		if ctx.Err() != nil {
