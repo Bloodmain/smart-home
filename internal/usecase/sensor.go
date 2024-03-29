@@ -14,11 +14,11 @@ const (
 )
 
 type Sensor struct {
-	sr SensorRepository
+	sensorRepository SensorRepository
 }
 
 func NewSensor(sr SensorRepository) *Sensor {
-	return &Sensor{sr: sr}
+	return &Sensor{sensorRepository: sr}
 }
 
 func validate(sensor *domain.Sensor) error {
@@ -36,11 +36,11 @@ func (s *Sensor) RegisterSensor(ctx context.Context, sensor *domain.Sensor) (*do
 	if err := validate(sensor); err != nil {
 		return nil, err
 	}
-	old, err := s.sr.GetSensorBySerialNumber(ctx, sensor.SerialNumber)
+	old, err := s.sensorRepository.GetSensorBySerialNumber(ctx, sensor.SerialNumber)
 	if err != nil {
 		// Неужели надо чекать на ошибку, которая объявлена на более высоком уровне? А как же инверсия зависимостей :(
 		if errors.Is(err, inmemory.ErrSensorNotFound) {
-			if err = s.sr.SaveSensor(ctx, sensor); err != nil {
+			if err = s.sensorRepository.SaveSensor(ctx, sensor); err != nil {
 				return nil, err
 			}
 			return sensor, nil
@@ -53,9 +53,9 @@ func (s *Sensor) RegisterSensor(ctx context.Context, sensor *domain.Sensor) (*do
 }
 
 func (s *Sensor) GetSensors(ctx context.Context) ([]domain.Sensor, error) {
-	return s.sr.GetSensors(ctx)
+	return s.sensorRepository.GetSensors(ctx)
 }
 
 func (s *Sensor) GetSensorByID(ctx context.Context, id int64) (*domain.Sensor, error) {
-	return s.sr.GetSensorByID(ctx, id)
+	return s.sensorRepository.GetSensorByID(ctx, id)
 }
