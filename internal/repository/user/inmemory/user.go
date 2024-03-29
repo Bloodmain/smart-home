@@ -32,34 +32,23 @@ func (r *UserRepository) SaveUser(ctx context.Context, user *domain.User) error 
 }
 
 func (r *UserRepository) GetUserByID(ctx context.Context, id int64) (*domain.User, error) {
-	done := make(chan struct{})
-	found := make(chan *domain.User)
-
-	go func() {
-		r.m.RLock()
-	outer:
-		for _, v := range r.storage {
-			select {
-			case <-ctx.Done():
-				break outer
-			default:
-
-				if v.ID == id {
-					found <- v
-					break
-				}
+	r.m.RLock()
+	for _, v := range r.storage {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+			if v.ID == id {
+				return v, ctx.Err()
 			}
 		}
-		r.m.RUnlock()
-		done <- struct{}{}
-	}()
+	}
+	r.m.RUnlock()
 
 	select {
 	case <-ctx.Done():
 		return nil, ctx.Err()
-	case s := <-found:
-		return s, nil
-	case <-done:
+	default:
 		return nil, ErrUserNotFound
 	}
 }

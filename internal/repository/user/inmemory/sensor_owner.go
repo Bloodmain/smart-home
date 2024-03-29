@@ -23,30 +23,25 @@ func (r *SensorOwnerRepository) SaveSensorOwner(ctx context.Context, sensorOwner
 }
 
 func (r *SensorOwnerRepository) GetSensorsByUserID(ctx context.Context, userID int64) ([]domain.SensorOwner, error) {
-	done := make(chan struct{})
 	sensors := make([]domain.SensorOwner, 0, len(r.storage))
 
-	go func() {
-		r.m.RLock()
-	outer:
-		for _, v := range r.storage {
-			select {
-			case <-ctx.Done():
-				break outer
-			default:
-				if v.UserID == userID {
-					sensors = append(sensors, v)
-				}
+	r.m.RLock()
+	for _, v := range r.storage {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+			if v.UserID == userID {
+				sensors = append(sensors, v)
 			}
 		}
-		r.m.RUnlock()
-		done <- struct{}{}
-	}()
+	}
+	r.m.RUnlock()
 
 	select {
 	case <-ctx.Done():
 		return nil, ctx.Err()
-	case <-done:
+	default:
 		return sensors, nil
 	}
 }
