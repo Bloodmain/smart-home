@@ -13,13 +13,15 @@ var (
 	ErrNilSensorPointer = errors.New("nil sensor is provided")
 )
 
+type SensorSerialNumber string
+
 type SensorRepository struct {
-	storage []*domain.Sensor
+	storage map[SensorSerialNumber]*domain.Sensor
 	m       sync.RWMutex
 }
 
 func NewSensorRepository() *SensorRepository {
-	return &SensorRepository{storage: []*domain.Sensor{}, m: sync.RWMutex{}}
+	return &SensorRepository{storage: map[SensorSerialNumber]*domain.Sensor{}, m: sync.RWMutex{}}
 }
 
 func (r *SensorRepository) SaveSensor(ctx context.Context, sensor *domain.Sensor) error {
@@ -28,7 +30,7 @@ func (r *SensorRepository) SaveSensor(ctx context.Context, sensor *domain.Sensor
 	}
 	sensor.RegisteredAt = time.Now()
 	r.m.Lock()
-	r.storage = append(r.storage, sensor)
+	r.storage[SensorSerialNumber(sensor.SerialNumber)] = sensor
 	r.m.Unlock()
 	return ctx.Err()
 }
@@ -51,34 +53,36 @@ func (r *SensorRepository) GetSensors(ctx context.Context) ([]domain.Sensor, err
 }
 
 func (r *SensorRepository) GetSensorByID(ctx context.Context, id int64) (*domain.Sensor, error) {
-	return r.getSensorFunc(ctx, func(sensor *domain.Sensor) bool {
-		return sensor.ID == id
-	})
-}
-
-func (r *SensorRepository) GetSensorBySerialNumber(ctx context.Context, sn string) (*domain.Sensor, error) {
-	return r.getSensorFunc(ctx, func(sensor *domain.Sensor) bool {
-		return sensor.SerialNumber == sn
-	})
-}
-
-func (r *SensorRepository) getSensorFunc(ctx context.Context, p func(sensor *domain.Sensor) bool) (*domain.Sensor, error) {
 	r.m.RLock()
 	for _, v := range r.storage {
 		select {
 		case <-ctx.Done():
 			return nil, ctx.Err()
 		default:
-			if p(v) {
+			if v.ID == id {
 				return v, ctx.Err()
 			}
 		}
 	}
 	r.m.RUnlock()
+
 	select {
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	default:
 		return nil, ErrSensorNotFound
 	}
+}
+
+func (r *SensorRepository) GetSensorBySerialNumber(ctx context.Context, sn string) (*domain.Sensor, error) {
+	r.m.RLock()
+	sensor, has := r.storage[SensorSerialNumber(sn)]
+	r.m.RUnlock()
+	if !has {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		return nil, ErrSensorNotFound
+	}
+	return sensor, ctx.Err()
 }
