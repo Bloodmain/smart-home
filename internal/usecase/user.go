@@ -6,38 +6,38 @@ import (
 )
 
 type User struct {
-	ur  UserRepository
-	sr  SensorRepository
-	sor SensorOwnerRepository
+	userRepository        UserRepository
+	sensorRepository      SensorRepository
+	sensorOwnerRepository SensorOwnerRepository
 }
 
 func NewUser(ur UserRepository, sor SensorOwnerRepository, sr SensorRepository) *User {
-	return &User{ur: ur, sr: sr, sor: sor}
+	return &User{userRepository: ur, sensorRepository: sr, sensorOwnerRepository: sor}
 }
 
 func (u *User) RegisterUser(ctx context.Context, user *domain.User) (*domain.User, error) {
 	if len(user.Name) == 0 {
 		return nil, ErrInvalidUserName
 	}
-	return user, u.ur.SaveUser(ctx, user)
+	return user, u.userRepository.SaveUser(ctx, user)
 }
 
 func (u *User) AttachSensorToUser(ctx context.Context, userID, sensorID int64) error {
-	if _, err := u.ur.GetUserByID(ctx, userID); err != nil {
+	if _, err := u.userRepository.GetUserByID(ctx, userID); err != nil {
 		return err
 	}
-	if _, err := u.sr.GetSensorByID(ctx, sensorID); err != nil {
+	if _, err := u.sensorRepository.GetSensorByID(ctx, sensorID); err != nil {
 		return err
 	}
-	return u.sor.SaveSensorOwner(ctx, domain.SensorOwner{UserID: userID, SensorID: sensorID})
+	return u.sensorOwnerRepository.SaveSensorOwner(ctx, domain.SensorOwner{UserID: userID, SensorID: sensorID})
 }
 
 func (u *User) GetUserSensors(ctx context.Context, userID int64) ([]domain.Sensor, error) {
-	if _, err := u.ur.GetUserByID(ctx, userID); err != nil {
+	if _, err := u.userRepository.GetUserByID(ctx, userID); err != nil {
 		return nil, err
 	}
 
-	sOwners, err := u.sor.GetSensorsByUserID(ctx, userID)
+	sOwners, err := u.sensorOwnerRepository.GetSensorsByUserID(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -53,7 +53,7 @@ func (u *User) GetUserSensors(ctx context.Context, userID int64) ([]domain.Senso
 			case <-ctx.Done():
 				break outer
 			default:
-				sensor, err := u.sr.GetSensorByID(ctx, so.SensorID)
+				sensor, err := u.sensorRepository.GetSensorByID(ctx, so.SensorID)
 				if err != nil {
 					e <- err
 					return
