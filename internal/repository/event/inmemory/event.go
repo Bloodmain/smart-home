@@ -12,6 +12,8 @@ var ErrNilEventPointer = errors.New("nil event is provided")
 
 type SensorId int64
 
+type SensorId int64
+
 type EventRepository struct {
 	// maps sensor's id to its last event
 	lastEvent map[SensorId]*domain.Event
