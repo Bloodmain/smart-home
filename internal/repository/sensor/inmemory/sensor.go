@@ -65,18 +65,18 @@ func (r *SensorRepository) GetSensors(ctx context.Context) ([]domain.Sensor, err
 }
 
 func (r *SensorRepository) GetSensorByID(ctx context.Context, id int64) (*domain.Sensor, error) {
-	return r.getSensorBy(ctx, func(sensor *domain.Sensor) bool {
+	return r.getSensorFunc(ctx, func(sensor *domain.Sensor) bool {
 		return sensor.ID == id
 	})
 }
 
 func (r *SensorRepository) GetSensorBySerialNumber(ctx context.Context, sn string) (*domain.Sensor, error) {
-	return r.getSensorBy(ctx, func(sensor *domain.Sensor) bool {
+	return r.getSensorFunc(ctx, func(sensor *domain.Sensor) bool {
 		return sensor.SerialNumber == sn
 	})
 }
 
-func (r *SensorRepository) getSensorBy(ctx context.Context, p func(sensor *domain.Sensor) bool) (*domain.Sensor, error) {
+func (r *SensorRepository) getSensorFunc(ctx context.Context, p func(sensor *domain.Sensor) bool) (*domain.Sensor, error) {
 	done := make(chan struct{})
 	found := make(chan *domain.Sensor)
 
