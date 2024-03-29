@@ -42,34 +42,20 @@ func (u *User) GetUserSensors(ctx context.Context, userID int64) ([]domain.Senso
 		return nil, err
 	}
 
-	done := make(chan struct{})
-	e := make(chan error)
 	s := make([]domain.Sensor, 0, len(sOwners))
 
-	go func() {
-	outer:
-		for _, so := range sOwners {
-			select {
-			case <-ctx.Done():
-				break outer
-			default:
-				sensor, err := u.sensorRepository.GetSensorByID(ctx, so.SensorID)
-				if err != nil {
-					e <- err
-					return
-				}
-				s = append(s, *sensor)
+	for _, so := range sOwners {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+			sensor, err := u.sensorRepository.GetSensorByID(ctx, so.SensorID)
+			if err != nil {
+				return nil, err
 			}
+			s = append(s, *sensor)
 		}
-		done <- struct{}{}
-	}()
-
-	select {
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	case err = <-e:
-		return nil, err
-	case <-done:
-		return s, nil
 	}
+
+	return s, ctx.Err()
 }

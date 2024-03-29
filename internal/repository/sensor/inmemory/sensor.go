@@ -18,10 +18,6 @@ type SensorRepository struct {
 	m       sync.RWMutex
 }
 
-/*
- Код всех классов inmemory очень похож, но идей, как вынести общий код без дженериков/темплейтов, нет :(
-*/
-
 func NewSensorRepository() *SensorRepository {
 	return &SensorRepository{storage: []*domain.Sensor{}, m: sync.RWMutex{}}
 }
@@ -38,30 +34,20 @@ func (r *SensorRepository) SaveSensor(ctx context.Context, sensor *domain.Sensor
 }
 
 func (r *SensorRepository) GetSensors(ctx context.Context) ([]domain.Sensor, error) {
-	done := make(chan struct{})
 	sensors := make([]domain.Sensor, 0, len(r.storage))
 
-	go func() {
-		r.m.RLock()
-	outer:
-		for _, v := range r.storage {
-			select {
-			case <-ctx.Done():
-				break outer
-			default:
-				sensors = append(sensors, *v)
-			}
+	r.m.RLock()
+	for _, v := range r.storage {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+			sensors = append(sensors, *v)
 		}
-		r.m.RUnlock()
-		done <- struct{}{}
-	}()
-
-	select {
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	case <-done:
-		return sensors, nil
 	}
+	r.m.RUnlock()
+
+	return sensors, ctx.Err()
 }
 
 func (r *SensorRepository) GetSensorByID(ctx context.Context, id int64) (*domain.Sensor, error) {
@@ -77,33 +63,22 @@ func (r *SensorRepository) GetSensorBySerialNumber(ctx context.Context, sn strin
 }
 
 func (r *SensorRepository) getSensorFunc(ctx context.Context, p func(sensor *domain.Sensor) bool) (*domain.Sensor, error) {
-	done := make(chan struct{})
-	found := make(chan *domain.Sensor)
-
-	go func() {
-		r.m.RLock()
-	outer:
-		for _, v := range r.storage {
-			select {
-			case <-ctx.Done():
-				break outer
-			default:
-				if p(v) {
-					found <- v
-					break
-				}
+	r.m.RLock()
+	for _, v := range r.storage {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+			if p(v) {
+				return v, ctx.Err()
 			}
 		}
-		r.m.RUnlock()
-		done <- struct{}{}
-	}()
-
+	}
+	r.m.RUnlock()
 	select {
 	case <-ctx.Done():
 		return nil, ctx.Err()
-	case s := <-found:
-		return s, nil
-	case <-done:
+	default:
 		return nil, ErrSensorNotFound
 	}
 }
