@@ -4,13 +4,11 @@ import (
 	"context"
 	"errors"
 	"homework/internal/domain"
+	"homework/internal/usecase"
 	"sync"
 )
 
-var (
-	ErrUserNotFound   = errors.New("user not found")
-	ErrNilUserPointer = errors.New("nil user is provided")
-)
+var ErrNilUserPointer = errors.New("nil user is provided")
 
 type UserID int64
 
@@ -41,7 +39,7 @@ func (r *UserRepository) GetUserByID(ctx context.Context, id int64) (*domain.Use
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
 		}
-		return nil, ErrUserNotFound
+		return nil, usecase.ErrUserNotFound
 	}
 	return user, ctx.Err()
 }
