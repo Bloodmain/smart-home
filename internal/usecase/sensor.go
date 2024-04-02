@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"homework/internal/domain"
-	"homework/internal/repository/sensor/inmemory"
 	"regexp"
 )
 
@@ -38,7 +37,7 @@ func (s *Sensor) RegisterSensor(ctx context.Context, sensor *domain.Sensor) (*do
 	}
 	old, err := s.sensorRepository.GetSensorBySerialNumber(ctx, sensor.SerialNumber)
 	if err != nil {
-		if errors.Is(err, inmemory.ErrSensorNotFound) {
+		if errors.Is(err, ErrSensorNotFound) {
 			if err = s.sensorRepository.SaveSensor(ctx, sensor); err != nil {
 				return nil, err
 			}

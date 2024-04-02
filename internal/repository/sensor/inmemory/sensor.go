@@ -4,14 +4,12 @@ import (
 	"context"
 	"errors"
 	"homework/internal/domain"
+	"homework/internal/usecase"
 	"sync"
 	"time"
 )
 
-var (
-	ErrSensorNotFound   = errors.New("sensor not found")
-	ErrNilSensorPointer = errors.New("nil sensor is provided")
-)
+var ErrNilSensorPointer = errors.New("nil sensor is provided")
 
 type SensorSerialNumber string
 
@@ -70,7 +68,7 @@ func (r *SensorRepository) GetSensorByID(ctx context.Context, id int64) (*domain
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	default:
-		return nil, ErrSensorNotFound
+		return nil, usecase.ErrSensorNotFound
 	}
 }
 
@@ -82,7 +80,7 @@ func (r *SensorRepository) GetSensorBySerialNumber(ctx context.Context, sn strin
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
 		}
-		return nil, ErrSensorNotFound
+		return nil, usecase.ErrSensorNotFound
 	}
 	return sensor, ctx.Err()
 }

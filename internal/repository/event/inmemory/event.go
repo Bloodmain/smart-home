@@ -4,13 +4,11 @@ import (
 	"context"
 	"errors"
 	"homework/internal/domain"
+	"homework/internal/usecase"
 	"sync"
 )
 
-var (
-	ErrEventNotFound   = errors.New("event not found")
-	ErrNilEventPointer = errors.New("nil event is provided")
-)
+var ErrNilEventPointer = errors.New("nil event is provided")
 
 type SensorId int64
 
@@ -45,7 +43,7 @@ func (r *EventRepository) GetLastEventBySensorID(ctx context.Context, id int64) 
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
 		}
-		return nil, ErrEventNotFound
+		return nil, usecase.ErrEventNotFound
 	}
 	return event, ctx.Err()
 }
