@@ -158,6 +158,13 @@ paths:
         - sensors
       produces:
       - application/json
+      parameters:
+      - name: "sensor_id"
+        in: "path"
+        description: "Идентификатор сенсора"
+        required: true
+        type: "integer"
+        format: "int64"
       responses:
         '200':
           description: Успех
@@ -179,6 +186,13 @@ paths:
       summary: Запрос заголовков
       description: Возвращает заголовки ответа GET
       operationId: headSensor
+      parameters:
+        - name: "sensor_id"
+          in: "path"
+          description: "Идентификатор сенсора"
+          required: true
+          type: "integer"
+          format: "int64"
       tags:
         - sensors
       responses:
@@ -199,6 +213,13 @@ paths:
       summary: Получение доступных методов
       description: Возвращает в заголовке Allow список доступных методов
       operationId: sensorOptions
+      parameters:
+        - name: "sensor_id"
+          in: "path"
+          description: "Идентификатор сенсора"
+          required: true
+          type: "integer"
+          format: "int64"
       tags:
         - sensors
       responses:
@@ -338,6 +359,12 @@ paths:
       consumes:
       - application/json
       parameters:
+      - name: "user_id"
+        in: "path"
+        description: "Идентификатор пользователя"
+        required: true
+        type: "integer"
+        format: "int64"
       - in: "body"
         name: "body"
         description: "Параметры привязки"
@@ -367,6 +394,13 @@ paths:
       summary: Получение доступных методов
       description: Возвращает в заголовке Allow список доступных методов
       operationId: usersSensorsOptions
+      parameters:
+        - name: "user_id"
+          in: "path"
+          description: "Идентификатор пользователя"
+          required: true
+          type: "integer"
+          format: "int64"
       tags:
         - users
       responses:

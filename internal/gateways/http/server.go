@@ -13,6 +13,11 @@ type Server struct {
 	router *gin.Engine
 }
 
+const (
+	DefaultPort = 8080
+	DefaultHost = "localhost"
+)
+
 type UseCases struct {
 	Event  *usecase.Event
 	Sensor *usecase.Sensor
@@ -23,7 +28,7 @@ func NewServer(useCases UseCases, options ...func(*Server)) *Server {
 	r := gin.Default()
 	setupRouter(r, useCases)
 
-	s := &Server{router: r, host: "localhost", port: 8080}
+	s := &Server{router: r, host: DefaultHost, port: DefaultPort}
 	for _, o := range options {
 		o(s)
 	}
