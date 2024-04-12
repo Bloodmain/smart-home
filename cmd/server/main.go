@@ -15,6 +15,7 @@ import (
 	eventRepository "homework/internal/repository/event/postgres"
 	sensorRepository "homework/internal/repository/sensor/postgres"
 	userRepository "homework/internal/repository/user/postgres"
+	"strconv"
 )
 
 func main() {
@@ -43,9 +44,20 @@ func main() {
 		User:   usecase.NewUser(ur, sor, sr),
 	}
 
-	// TODO реализовать веб-сервис
+	host, present := os.LookupEnv("HTTP_HOST")
+	if !present {
+		host = httpGateway.DefaultHost
+	}
+	portRaw, present := os.LookupEnv("HTTP_HOST")
+	port, err := strconv.Atoi(portRaw)
+	if !present {
+		port = httpGateway.DefaultPort
+	}
+	if err != nil || port < 0 || port > 9999 {
+		log.Fatalf("invalid port number: %s\n", os.Getenv("HTTP_PORT"))
+	}
 
-	r := httpGateway.NewServer(useCases)
+	r := httpGateway.NewServer(useCases, httpGateway.WithHost(host), httpGateway.WithPort(uint16(port)))
 	if err := r.Run(ctx); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		log.Printf("error during server shutdown: %v", err)
 	}
