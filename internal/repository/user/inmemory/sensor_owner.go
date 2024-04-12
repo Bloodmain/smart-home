@@ -26,6 +26,7 @@ func (r *SensorOwnerRepository) GetSensorsByUserID(ctx context.Context, userID i
 	sensors := make([]domain.SensorOwner, 0, len(r.storage))
 
 	r.m.RLock()
+	defer r.m.RUnlock()
 	for _, v := range r.storage {
 		select {
 		case <-ctx.Done():
@@ -36,7 +37,6 @@ func (r *SensorOwnerRepository) GetSensorsByUserID(ctx context.Context, userID i
 			}
 		}
 	}
-	r.m.RUnlock()
 
 	select {
 	case <-ctx.Done():

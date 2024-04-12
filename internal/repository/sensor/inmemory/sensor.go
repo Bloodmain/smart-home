@@ -37,6 +37,7 @@ func (r *SensorRepository) GetSensors(ctx context.Context) ([]domain.Sensor, err
 	sensors := make([]domain.Sensor, 0, len(r.storage))
 
 	r.m.RLock()
+	defer r.m.RUnlock()
 	for _, v := range r.storage {
 		select {
 		case <-ctx.Done():
@@ -45,13 +46,13 @@ func (r *SensorRepository) GetSensors(ctx context.Context) ([]domain.Sensor, err
 			sensors = append(sensors, *v)
 		}
 	}
-	r.m.RUnlock()
 
 	return sensors, ctx.Err()
 }
 
 func (r *SensorRepository) GetSensorByID(ctx context.Context, id int64) (*domain.Sensor, error) {
 	r.m.RLock()
+	defer r.m.RUnlock()
 	for _, v := range r.storage {
 		select {
 		case <-ctx.Done():
@@ -62,7 +63,6 @@ func (r *SensorRepository) GetSensorByID(ctx context.Context, id int64) (*domain
 			}
 		}
 	}
-	r.m.RUnlock()
 
 	select {
 	case <-ctx.Done():
@@ -74,8 +74,8 @@ func (r *SensorRepository) GetSensorByID(ctx context.Context, id int64) (*domain
 
 func (r *SensorRepository) GetSensorBySerialNumber(ctx context.Context, sn string) (*domain.Sensor, error) {
 	r.m.RLock()
+	defer r.m.RUnlock()
 	sensor, has := r.storage[SensorSerialNumber(sn)]
-	r.m.RUnlock()
 	if !has {
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
