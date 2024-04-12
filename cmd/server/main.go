@@ -3,16 +3,16 @@ package main
 import (
 	"context"
 	"errors"
+	httpGateway "homework/internal/gateways/http"
+	eventRepository "homework/internal/repository/event/inmemory"
+	sensorRepository "homework/internal/repository/sensor/inmemory"
+	userRepository "homework/internal/repository/user/inmemory"
 	"homework/internal/usecase"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
-
-	httpGateway "homework/internal/gateways/http"
-	eventRepository "homework/internal/repository/event/inmemory"
-	sensorRepository "homework/internal/repository/sensor/inmemory"
-	userRepository "homework/internal/repository/user/inmemory"
+	"strconv"
 )
 
 func main() {
@@ -30,9 +30,20 @@ func main() {
 		User:   usecase.NewUser(ur, sor, sr),
 	}
 
-	// TODO реализовать веб-сервис
+	host, present := os.LookupEnv("HTTP_HOST")
+	if !present {
+		host = httpGateway.DefaultHost
+	}
+	portRaw, present := os.LookupEnv("HTTP_HOST")
+	port, err := strconv.Atoi(portRaw)
+	if !present {
+		port = httpGateway.DefaultPort
+	}
+	if err != nil || port < 0 || port > 9999 {
+		log.Fatalf("invalid port number: %s\n", os.Getenv("HTTP_PORT"))
+	}
 
-	r := httpGateway.NewServer(useCases)
+	r := httpGateway.NewServer(useCases, httpGateway.WithHost(host), httpGateway.WithPort(uint16(port)))
 	if err := r.Run(ctx); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		log.Printf("error during server shutdown: %v", err)
 	}
