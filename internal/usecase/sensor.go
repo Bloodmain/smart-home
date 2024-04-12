@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"homework/internal/domain"
 	"regexp"
+	"sync"
 )
 
 const (
@@ -15,6 +16,11 @@ const (
 type Sensor struct {
 	sensorRepository SensorRepository
 }
+
+var (
+	sensorIdsMutex sync.Mutex
+	sensorIds      int64 = 1
+)
 
 func NewSensor(sr SensorRepository) *Sensor {
 	return &Sensor{sensorRepository: sr}
@@ -40,6 +46,12 @@ func (s *Sensor) RegisterSensor(ctx context.Context, sensor *domain.Sensor) (*do
 		if errors.Is(err, ErrSensorNotFound) {
 			if err = s.sensorRepository.SaveSensor(ctx, sensor); err != nil {
 				return nil, err
+			}
+			if sensor.ID <= 0 {
+				sensorIdsMutex.Lock()
+				sensor.ID = sensorIds
+				sensorIds++
+				sensorIdsMutex.Unlock()
 			}
 			return sensor, nil
 		}
