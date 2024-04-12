@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"homework/internal/domain"
+	"sync"
 )
 
 type User struct {
@@ -11,6 +12,11 @@ type User struct {
 	sensorOwnerRepository SensorOwnerRepository
 }
 
+var (
+	userIdMutex sync.Mutex
+	userIds     int64 = 1
+)
+
 func NewUser(ur UserRepository, sor SensorOwnerRepository, sr SensorRepository) *User {
 	return &User{userRepository: ur, sensorRepository: sr, sensorOwnerRepository: sor}
 }
@@ -18,6 +24,12 @@ func NewUser(ur UserRepository, sor SensorOwnerRepository, sr SensorRepository) 
 func (u *User) RegisterUser(ctx context.Context, user *domain.User) (*domain.User, error) {
 	if len(user.Name) == 0 {
 		return nil, ErrInvalidUserName
+	}
+	if user.ID <= 0 {
+		userIdMutex.Lock()
+		user.ID = userIds
+		userIds++
+		userIdMutex.Unlock()
 	}
 	return user, u.userRepository.SaveUser(ctx, user)
 }
