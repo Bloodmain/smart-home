@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"homework/internal/domain"
-	"homework/internal/gateways/http/dtos"
+	"homework/internal/gateways/http/models"
 	"homework/internal/usecase"
 	"io"
 	"net/http"
@@ -13,7 +13,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Bloodmain/validator/validator"
+	"github.com/go-openapi/strfmt"
+
 	"github.com/gin-gonic/gin"
 	"github.com/jeanfric/goembed/countingwriter"
 )
@@ -54,19 +55,21 @@ func checkContentType(ctx *gin.Context) bool {
 	return true
 }
 
-func getSensorsDto(items ...domain.Sensor) []dtos.Sensor {
-	itemsDto := make([]dtos.Sensor, len(items))
+func getSensorsDto(items ...domain.Sensor) []models.Sensor {
+	itemsDto := make([]models.Sensor, len(items))
 
-	for i, item := range items {
-		itemsDto[i] = dtos.Sensor{
-			CurrentState: item.CurrentState,
-			Description:  item.Description,
-			ID:           item.ID,
-			IsActive:     item.IsActive,
-			LastActivity: item.LastActivity,
-			RegisteredAt: item.RegisteredAt,
-			SerialNumber: item.SerialNumber,
-			Type:         string(item.Type),
+	for i, it := range items {
+		item := it
+		name := string(item.Type)
+		itemsDto[i] = models.Sensor{
+			CurrentState: &item.CurrentState,
+			Description:  &item.Description,
+			ID:           &item.ID,
+			IsActive:     &item.IsActive,
+			LastActivity: (*strfmt.DateTime)(&item.LastActivity),
+			RegisteredAt: (*strfmt.DateTime)(&item.RegisteredAt),
+			SerialNumber: &item.SerialNumber,
+			Type:         &name,
 		}
 	}
 	return itemsDto
@@ -207,13 +210,18 @@ func setupHeadUserIdHandler(uc UseCases) gin.HandlerFunc {
 	}
 }
 
-func bindAndValidate[T any, Pointer *T](ctx *gin.Context, item Pointer) bool {
+type validatable interface {
+	*models.SensorEvent | *models.SensorToCreate | *models.UserToCreate | *models.SensorToUserBinding
+	Validate(formats strfmt.Registry) error
+}
+
+func bindAndValidate[T validatable](ctx *gin.Context, item T) bool {
 	if err := ctx.ShouldBindJSON(item); err != nil {
 		ctx.AbortWithStatus(http.StatusBadRequest)
 		return false
 	}
 
-	if err := validator.Validate(*item); err != nil {
+	if err := item.Validate(nil); err != nil {
 		ctx.AbortWithStatus(http.StatusUnprocessableEntity)
 		return false
 	}
@@ -225,12 +233,12 @@ func setupPostEventHandler(uc UseCases) gin.HandlerFunc {
 		if !checkContentType(ctx) {
 			return
 		}
-		e := dtos.Event{}
+		e := models.SensorEvent{}
 		if !bindAndValidate(ctx, &e) {
 			return
 		}
 
-		newEvent := domain.Event{SensorSerialNumber: e.SensorSerialNumber, Payload: e.Payload, Timestamp: time.Now()}
+		newEvent := domain.Event{SensorSerialNumber: *e.SensorSerialNumber, Payload: *e.Payload, Timestamp: time.Now()}
 		if err := uc.Event.ReceiveEvent(ctx, &newEvent); err != nil {
 			ctx.AbortWithStatus(http.StatusInternalServerError)
 		} else {
@@ -244,13 +252,13 @@ func setupPostSensorHandler(uc UseCases) gin.HandlerFunc {
 		if !checkContentType(ctx) {
 			return
 		}
-		e := dtos.SensorToCreate{}
+		e := models.SensorToCreate{}
 		if !bindAndValidate(ctx, &e) {
 			return
 		}
 		newItem := domain.Sensor{
-			SerialNumber: e.SerialNumber, Description: e.Description,
-			IsActive: e.IsActive, Type: domain.SensorType(e.Type),
+			SerialNumber: *e.SerialNumber, Description: *e.Description,
+			IsActive: *e.IsActive, Type: domain.SensorType(*e.Type),
 		}
 		if item, err := uc.Sensor.RegisterSensor(ctx, &newItem); err != nil {
 			ctx.AbortWithStatus(http.StatusInternalServerError)
@@ -265,17 +273,17 @@ func setupPostUserHandler(uc UseCases) gin.HandlerFunc {
 		if !checkContentType(ctx) {
 			return
 		}
-		e := dtos.UserToCreate{}
+		e := models.UserToCreate{}
 		if !bindAndValidate(ctx, &e) {
 			return
 		}
-		newItem := domain.User{Name: e.Name}
+		newItem := domain.User{Name: *e.Name}
 		if u, err := uc.User.RegisterUser(ctx, &newItem); err != nil {
 			ctx.AbortWithStatus(http.StatusInternalServerError)
 		} else {
-			ctx.JSON(http.StatusOK, dtos.User{
-				ID:   u.ID,
-				Name: u.Name,
+			ctx.JSON(http.StatusOK, models.User{
+				ID:   &u.ID,
+				Name: &u.Name,
 			})
 		}
 	}
@@ -291,12 +299,12 @@ func setupPostUserIdHandler(uc UseCases) gin.HandlerFunc {
 			ctx.AbortWithStatus(http.StatusUnprocessableEntity)
 			return
 		}
-		e := dtos.SensorToUserBinding{}
+		e := models.SensorToUserBinding{}
 		if !bindAndValidate(ctx, &e) {
 			return
 		}
 
-		err = uc.User.AttachSensorToUser(ctx, userId, e.SensorID)
+		err = uc.User.AttachSensorToUser(ctx, userId, *e.SensorID)
 		if err != nil {
 			if errors.Is(err, usecase.ErrUserNotFound) || errors.Is(err, usecase.ErrSensorNotFound) {
 				ctx.AbortWithStatus(http.StatusNotFound)
