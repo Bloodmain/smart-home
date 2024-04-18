@@ -1,12 +1,14 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"homework/internal/usecase"
 	"log"
 	"net/http"
 	"os"
 	"strconv"
+	"os/signal"
 
 	httpGateway "homework/internal/gateways/http"
 	eventRepository "homework/internal/repository/event/inmemory"
@@ -15,6 +17,9 @@ import (
 )
 
 func main() {
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer cancel()
+
 	er := eventRepository.NewEventRepository()
 	sr := sensorRepository.NewSensorRepository()
 	ur := userRepository.NewUserRepository()

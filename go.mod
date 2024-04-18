@@ -11,6 +11,7 @@ require (
 	github.com/golang/mock v1.6.0
 	github.com/jeanfric/goembed v0.0.0-20150102173004-6e25e9e10085
 	github.com/stretchr/testify v1.9.0
+	nhooyr.io/websocket v1.8.11
 )
 
 require (

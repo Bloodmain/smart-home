@@ -19,31 +19,29 @@ paths:
       tags:
         - events
       consumes:
-      - application/json
+        - application/json
       parameters:
-      - in: "body"
-        name: "body"
-        description: "Событие, которое надо зарегистрировать"
-        required: true
-        schema:
-          $ref: "#/definitions/SensorEvent"
+        - in: "body"
+          name: "body"
+          description: "Событие, которое надо зарегистрировать"
+          required: true
+          schema:
+            $ref: "#/definitions/SensorEvent"
       responses:
-        '201':
+        "201":
           description: Успех
-        '400':
+        "400":
           description: Тело запроса синтаксически невалидно
-        '415':
+        "415":
           description: Тело запроса в неподдерживаемом формате
-        '422':
+        "422":
           description: Тело запроса синтаксически валидно, но содержит невалидные данные
           schema:
-            type: object
-            $ref: '#/definitions/Error'
+            $ref: "#/definitions/Error"
         default:
           description: Ошибка исполнения
           schema:
-            type: object
-            $ref: '#/definitions/Error'
+            $ref: "#/definitions/Error"
     options:
       summary: Получение доступных методов
       description: Возвращает в заголовке Allow список доступных методов
@@ -51,7 +49,7 @@ paths:
       tags:
         - events
       responses:
-        '204':
+        "204":
           description: Успех
           headers:
             Allow:
@@ -67,22 +65,20 @@ paths:
       tags:
         - sensors
       produces:
-      - application/json
+        - application/json
       responses:
-        '200':
+        "200":
           description: Успех
           schema:
             type: array
             items:
-              type: object
-              $ref: '#/definitions/Sensor'
-        '406':
+              $ref: "#/definitions/Sensor"
+        "406":
           description: Запрошен неподдерживаемый формат тела ответа
         default:
           description: Ошибка исполнения
           schema:
-            type: object
-            $ref: '#/definitions/Error'
+            $ref: "#/definitions/Error"
     head:
       summary: Запрос заголовков
       description: Возвращает заголовки ответа GET
@@ -90,15 +86,14 @@ paths:
       tags:
         - sensors
       responses:
-        '200':
+        "200":
           description: Успех
-        '406':
+        "406":
           description: Запрошен неподдерживаемый формат тела ответа
         default:
           description: Ошибка исполнения
           schema:
-            type: object
-            $ref: '#/definitions/Error'
+            $ref: "#/definitions/Error"
     post:
       summary: Регистрация датчика
       description: Регистрирует датчик в системе
@@ -106,34 +101,31 @@ paths:
       tags:
         - sensors
       consumes:
-      - application/json
+        - application/json
       parameters:
-      - in: "body"
-        name: "body"
-        description: "Датчик, который надо зарегистрировать"
-        required: true
-        schema:
-          $ref: "#/definitions/SensorToCreate"
+        - in: "body"
+          name: "body"
+          description: "Датчик, который надо зарегистрировать"
+          required: true
+          schema:
+            $ref: "#/definitions/SensorToCreate"
       responses:
-        '200':
+        "200":
           description: Успех
           schema:
-            type: object
             $ref: "#/definitions/Sensor"
-        '400':
+        "400":
           description: Тело запроса синтаксически невалидно
-        '415':
+        "415":
           description: Тело запроса в неподдерживаемом формате
-        '422':
+        "422":
           description: Тело запроса синтаксически валидно, но содержит невалидные данные
           schema:
-            type: object
-            $ref: '#/definitions/Error'
+            $ref: "#/definitions/Error"
         default:
           description: Ошибка исполнения
           schema:
-            type: object
-            $ref: '#/definitions/Error'
+            $ref: "#/definitions/Error"
     options:
       summary: Получение доступных методов
       description: Возвращает в заголовке Allow список доступных методов
@@ -141,7 +133,7 @@ paths:
       tags:
         - sensors
       responses:
-        '204':
+        "204":
           description: Успех
           headers:
             Allow:
@@ -149,6 +141,26 @@ paths:
               type: array
               items:
                 type: string
+  /sensors/{sensor_id}/events:
+    get:
+      summary: Открытие ws по датчику
+      description: Позволяет подписаться на рассылку последних событий пришедших от датчика
+      tags:
+        - sensors
+      parameters:
+        - name: "sensor_id"
+          in: "path"
+          description: "Идентификатор датчика"
+          required: true
+          type: "integer"
+          format: "int64"
+      responses:
+        "101":
+          description: Успешное открытие ws
+        default:
+          description: Ошибка исполнения
+          schema:
+            $ref: "#/definitions/Error"
   /sensors/{sensor_id}:
     get:
       summary: Получение датчика
@@ -157,31 +169,29 @@ paths:
       tags:
         - sensors
       produces:
-      - application/json
+        - application/json
       parameters:
-      - name: "sensor_id"
-        in: "path"
-        description: "Идентификатор сенсора"
-        required: true
-        type: "integer"
-        format: "int64"
+        - name: "sensor_id"
+          in: "path"
+          description: "Идентификатор датчика"
+          required: true
+          type: "integer"
+          format: "int64"
       responses:
-        '200':
+        "200":
           description: Успех
           schema:
-            type: object
-            $ref: '#/definitions/Sensor'
-        '404':
+            $ref: "#/definitions/Sensor"
+        "404":
           description: Датчик с указанным идентификатором не найден
-        '422':
+        "422":
           description: Идентификатор датчика не валиден
-        '406':
+        "406":
           description: Запрошен неподдерживаемый формат тела ответа
         default:
           description: Ошибка исполнения
           schema:
-            type: object
-            $ref: '#/definitions/Error'
+            $ref: "#/definitions/Error"
     head:
       summary: Запрос заголовков
       description: Возвращает заголовки ответа GET
@@ -195,20 +205,26 @@ paths:
           format: "int64"
       tags:
         - sensors
+      parameters:
+        - name: "sensor_id"
+          in: "path"
+          description: "Идентификатор датчика"
+          required: true
+          type: "integer"
+          format: "int64"
       responses:
-        '200':
+        "200":
           description: Успех
-        '404':
+        "404":
           description: Датчик с указанным идентификатором не найден
-        '422':
+        "422":
           description: Идентификатор датчика не валиден
-        '406':
+        "406":
           description: Запрошен неподдерживаемый формат тела ответа
         default:
           description: Ошибка исполнения
           schema:
-            type: object
-            $ref: '#/definitions/Error'
+            $ref: "#/definitions/Error"
     options:
       summary: Получение доступных методов
       description: Возвращает в заголовке Allow список доступных методов
@@ -222,8 +238,15 @@ paths:
           format: "int64"
       tags:
         - sensors
+      parameters:
+        - name: "sensor_id"
+          in: "path"
+          description: "Идентификатор датчика"
+          required: true
+          type: "integer"
+          format: "int64"
       responses:
-        '204':
+        "204":
           description: Успех
           headers:
             Allow:
@@ -239,34 +262,31 @@ paths:
       tags:
         - users
       consumes:
-      - application/json
+        - application/json
       parameters:
-      - in: "body"
-        name: "body"
-        description: "Пользователь, которого надо зарегистрировать"
-        required: true
-        schema:
-          $ref: "#/definitions/UserToCreate"
+        - in: "body"
+          name: "body"
+          description: "Пользователь, которого надо зарегистрировать"
+          required: true
+          schema:
+            $ref: "#/definitions/UserToCreate"
       responses:
-        '200':
+        "200":
           description: Успех
           schema:
-            type: object
             $ref: "#/definitions/User"
-        '400':
+        "400":
           description: Тело запроса синтаксически невалидно
-        '415':
+        "415":
           description: Тело запроса в неподдерживаемом формате
-        '422':
+        "422":
           description: Тело запроса синтаксически валидно, но содержит невалидные данные
           schema:
-            type: object
-            $ref: '#/definitions/Error'
+            $ref: "#/definitions/Error"
         default:
           description: Ошибка исполнения
           schema:
-            type: object
-            $ref: '#/definitions/Error'
+            $ref: "#/definitions/Error"
     options:
       summary: Получение доступных методов
       description: Возвращает в заголовке Allow список доступных методов
@@ -274,7 +294,7 @@ paths:
       tags:
         - users
       responses:
-        '204':
+        "204":
           description: Успех
           headers:
             Allow:
@@ -290,36 +310,33 @@ paths:
       tags:
         - users
       produces:
-      - application/json
+        - application/json
       parameters:
-      - name: "user_id"
-        in: "path"
-        description: "Идентификатор пользователя"
-        required: true
-        type: "integer"
-        format: "int64"
+        - name: "user_id"
+          in: "path"
+          description: "Идентификатор пользователя"
+          required: true
+          type: "integer"
+          format: "int64"
       responses:
-        '200':
+        "200":
           description: Успех
           schema:
             type: array
             items:
-              type: object
-              $ref: '#/definitions/Sensor'
-        '404':
+              $ref: "#/definitions/Sensor"
+        "404":
           description: Нет пользователя с таким идентификатором
-        '406':
+        "406":
           description: Запрошен неподдерживаемый формат тела ответа
-        '422':
+        "422":
           description: Идентификатор пользователя не валиден
           schema:
-            type: object
-            $ref: '#/definitions/Error'
+            $ref: "#/definitions/Error"
         default:
           description: Ошибка исполнения
           schema:
-            type: object
-            $ref: '#/definitions/Error'
+            $ref: "#/definitions/Error"
     head:
       summary: Запрос заголовков
       description: Возвращает заголовки ответа GET
@@ -327,29 +344,27 @@ paths:
       tags:
         - users
       parameters:
-      - name: "user_id"
-        in: "path"
-        description: "Идентификатор пользователя"
-        required: true
-        type: "integer"
-        format: "int64"
+        - name: "user_id"
+          in: "path"
+          description: "Идентификатор пользователя"
+          required: true
+          type: "integer"
+          format: "int64"
       responses:
-        '200':
+        "200":
           description: Успех
-        '404':
+        "404":
           description: Нет пользователя с таким идентификатором
-        '406':
+        "406":
           description: Запрошен неподдерживаемый формат тела ответа
-        '422':
+        "422":
           description: Идентификатор пользователя не валиден
           schema:
-            type: object
-            $ref: '#/definitions/Error'
+            $ref: "#/definitions/Error"
         default:
           description: Ошибка исполнения
           schema:
-            type: object
-            $ref: '#/definitions/Error'
+            $ref: "#/definitions/Error"
     post:
       summary: Привязка датчика к пользователю
       description: Связывает данного пользователя с указанным датчиком
@@ -357,39 +372,37 @@ paths:
       tags:
         - users
       consumes:
-      - application/json
+        - application/json
       parameters:
-      - name: "user_id"
-        in: "path"
-        description: "Идентификатор пользователя"
-        required: true
-        type: "integer"
-        format: "int64"
-      - in: "body"
-        name: "body"
-        description: "Параметры привязки"
-        required: true
-        schema:
-          $ref: "#/definitions/SensorToUserBinding"
+        - name: "user_id"
+          in: "path"
+          description: "Идентификатор пользователя"
+          required: true
+          type: "integer"
+          format: "int64"
+        - in: "body"
+          name: "body"
+          description: "Параметры привязки"
+          required: true
+          schema:
+            $ref: "#/definitions/SensorToUserBinding"
       responses:
-        '201':
+        "201":
           description: Успех
-        '400':
+        "400":
           description: Тело запроса синтаксически невалидно
-        '404':
+        "404":
           description: Нет пользователя с таким идентификатором
-        '415':
+        "415":
           description: Тело запроса в неподдерживаемом формате
-        '422':
+        "422":
           description: Тело запроса синтаксически валидно, но содержит невалидные данные
           schema:
-            type: object
-            $ref: '#/definitions/Error'
+            $ref: "#/definitions/Error"
         default:
           description: Ошибка исполнения
           schema:
-            type: object
-            $ref: '#/definitions/Error'
+            $ref: "#/definitions/Error"
     options:
       summary: Получение доступных методов
       description: Возвращает в заголовке Allow список доступных методов
@@ -403,8 +416,15 @@ paths:
           format: "int64"
       tags:
         - users
+      parameters:
+        - name: "user_id"
+          in: "path"
+          description: "Идентификатор пользователя"
+          required: true
+          type: "integer"
+          format: "int64"
       responses:
-        '204':
+        "204":
           description: Успех
           headers:
             Allow:
@@ -478,8 +498,8 @@ definitions:
         type: string
         format: enum
         enum:
-        - cc
-        - adc
+          - cc
+          - adc
       current_state:
         description: Состояние датчика, соответствует значению в payload последнего обработанного события.
         type: integer
@@ -514,8 +534,8 @@ definitions:
       current_state: 1
       description: "Датчик температуры"
       is_active: true
-      registered_at: '2018-01-01T00:00:00Z'
-      last_activity: '2018-01-01T00:00:00Z'
+      registered_at: "2018-01-01T00:00:00Z"
+      last_activity: "2018-01-01T00:00:00Z"
   SensorToCreate:
     title: SensorToCreate
     description: Датчик умного дома, который надо создать
@@ -530,8 +550,8 @@ definitions:
         type: string
         format: enum
         enum:
-        - cc
-        - adc
+          - cc
+          - adc
       description:
         description: Описание
         type: string
@@ -576,8 +596,8 @@ definitions:
         type: integer
         format: int64
     required:
-    - sensor_serial_number
-    - payload
+      - sensor_serial_number
+      - payload
     example:
       sensor_serial_number: "1234567890"
       payload: 10
