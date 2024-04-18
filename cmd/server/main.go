@@ -3,16 +3,17 @@ package main
 import (
 	"context"
 	"errors"
-	httpGateway "homework/internal/gateways/http"
-	eventRepository "homework/internal/repository/event/inmemory"
-	sensorRepository "homework/internal/repository/sensor/inmemory"
-	userRepository "homework/internal/repository/user/inmemory"
 	"homework/internal/usecase"
 	"log"
 	"net/http"
 	"os"
-	"os/signal"
 	"strconv"
+	"os/signal"
+
+	httpGateway "homework/internal/gateways/http"
+	eventRepository "homework/internal/repository/event/inmemory"
+	sensorRepository "homework/internal/repository/sensor/inmemory"
+	userRepository "homework/internal/repository/user/inmemory"
 )
 
 func main() {
@@ -34,13 +35,13 @@ func main() {
 	if !present {
 		host = httpGateway.DefaultHost
 	}
-	portRaw, present := os.LookupEnv("HTTP_HOST")
+	portRaw, present := os.LookupEnv("HTTP_PORT")
 	port, err := strconv.Atoi(portRaw)
 	if !present {
 		port = httpGateway.DefaultPort
 	}
 	if err != nil || port < 0 || port > 9999 {
-		log.Fatalf("invalid port number: %s\n", os.Getenv("HTTP_PORT"))
+		log.Fatalf("invalid port number: %s\n", portRaw)
 	}
 
 	r := httpGateway.NewServer(useCases, httpGateway.WithHost(host), httpGateway.WithPort(uint16(port)))
