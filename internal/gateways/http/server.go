@@ -2,16 +2,20 @@ package http
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"homework/internal/usecase"
+	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
 
 type Server struct {
-	host   string
-	port   uint16
-	router *gin.Engine
+	host      string
+	port      uint16
+	router    *gin.Engine
+	wsHandler *WebSocketHandler
 }
 
 const (
@@ -27,9 +31,10 @@ type UseCases struct {
 
 func NewServer(useCases UseCases, options ...func(*Server)) *Server {
 	r := gin.Default()
-	setupRouter(r, useCases, NewWebSocketHandler(useCases))
+	ws := NewWebSocketHandler(useCases)
+	setupRouter(r, useCases, ws)
 
-	s := &Server{router: r, host: DefaultHost, port: DefaultPort}
+	s := &Server{router: r, host: DefaultHost, port: DefaultPort, wsHandler: ws}
 	for _, o := range options {
 		o(s)
 	}
@@ -50,5 +55,24 @@ func WithPort(port uint16) func(*Server) {
 }
 
 func (s *Server) Run(ctx context.Context) error {
-	return s.router.Run(fmt.Sprintf("%s:%d", s.host, s.port))
+	server := &http.Server{
+		Addr:    fmt.Sprintf("%s:%d", s.host, s.port),
+		Handler: s.router,
+	}
+
+	done := make(chan error)
+	go func() {
+		done <- server.ListenAndServe()
+	}()
+
+	select {
+	case <-ctx.Done():
+		c, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+
+		es := []error{server.Shutdown(c), s.wsHandler.Shutdown()}
+		return errors.Join(es...)
+	case err := <-done:
+		return err
+	}
 }
