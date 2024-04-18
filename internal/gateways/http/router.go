@@ -19,7 +19,7 @@ import (
 	"github.com/jeanfric/goembed/countingwriter"
 )
 
-func setupRouter(r *gin.Engine, uc UseCases) {
+func setupRouter(r *gin.Engine, uc UseCases, _ *WebSocketHandler) {
 	r.HandleMethodNotAllowed = true
 
 	r.POST("/events", setupPostEventHandler(uc))
