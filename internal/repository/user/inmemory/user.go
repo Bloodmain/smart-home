@@ -4,24 +4,42 @@ import (
 	"context"
 	"errors"
 	"homework/internal/domain"
+	"homework/internal/usecase"
+	"sync"
 )
 
-var ErrUserNotFound = errors.New("user not found")
+var ErrNilUserPointer = errors.New("nil user is provided")
+
+type UserID int64
 
 type UserRepository struct {
-	// TODO добавьте реализацию
+	storage map[UserID]*domain.User
+	m       sync.RWMutex
 }
 
 func NewUserRepository() *UserRepository {
-	return &UserRepository{}
+	return &UserRepository{storage: map[UserID]*domain.User{}, m: sync.RWMutex{}}
 }
 
 func (r *UserRepository) SaveUser(ctx context.Context, user *domain.User) error {
-	// TODO добавьте реализацию
-	return nil
+	if user == nil {
+		return ErrNilUserPointer
+	}
+	r.m.Lock()
+	r.storage[UserID(user.ID)] = user
+	r.m.Unlock()
+	return ctx.Err()
 }
 
 func (r *UserRepository) GetUserByID(ctx context.Context, id int64) (*domain.User, error) {
-	// TODO добавьте реализацию
-	return nil, nil
+	r.m.RLock()
+	user, has := r.storage[UserID(id)]
+	r.m.RUnlock()
+	if !has {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		return nil, usecase.ErrUserNotFound
+	}
+	return user, ctx.Err()
 }

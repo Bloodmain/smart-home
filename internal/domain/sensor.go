@@ -9,6 +9,8 @@ const (
 	SensorTypeADC            SensorType = "adc"
 )
 
+var AcceptableSensorTypes = map[SensorType]struct{}{SensorTypeADC: {}, SensorTypeContactClosure: {}}
+
 // Sensor - структура для хранения данных датчика
 type Sensor struct {
 	ID           int64
