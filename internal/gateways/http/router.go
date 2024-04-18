@@ -19,7 +19,7 @@ import (
 	"github.com/jeanfric/goembed/countingwriter"
 )
 
-func setupRouter(r *gin.Engine, uc UseCases, _ *WebSocketHandler) {
+func setupRouter(r *gin.Engine, uc UseCases, ws *WebSocketHandler) {
 	r.HandleMethodNotAllowed = true
 
 	r.POST("/events", setupPostEventHandler(uc))
@@ -37,6 +37,25 @@ func setupRouter(r *gin.Engine, uc UseCases, _ *WebSocketHandler) {
 	r.HEAD("/users/:user_id/sensors", setupHeadUserIdHandler(uc))
 	r.OPTIONS("/users/:user_id/sensors", setupOptionsUserIdHandler())
 	r.GET("/users/:user_id/sensors", setupGetUserIdHandler(uc))
+	r.GET("/sensors/:sensor_id/events", setupGetSensorEventHandler(ws))
+}
+
+func setupGetSensorEventHandler(ws *WebSocketHandler) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		id, err := strconv.ParseInt(ctx.Param("sensor_id"), 10, 64)
+		if err != nil {
+			ctx.AbortWithStatus(http.StatusUnprocessableEntity)
+			return
+		}
+
+		if err := ws.Handle(ctx, id); err != nil {
+			if errors.Is(err, usecase.ErrSensorNotFound) {
+				ctx.AbortWithStatus(http.StatusNotFound)
+			} else {
+				ctx.AbortWithStatus(http.StatusInternalServerError)
+			}
+		}
+	}
 }
 
 func checkAccept(ctx *gin.Context) bool {
