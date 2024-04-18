@@ -34,8 +34,5 @@ func (e *Event) ReceiveEvent(ctx context.Context, event *domain.Event) error {
 }
 
 func (e *Event) GetLastEventBySensorID(ctx context.Context, id int64) (*domain.Event, error) {
-	if _, err := e.sensorRepository.GetSensorByID(ctx, id); err != nil {
-		return nil, err
-	}
 	return e.eventRepository.GetLastEventBySensorID(ctx, id)
 }
