@@ -3,6 +3,7 @@ module homework
 go 1.22.0
 
 require (
+	github.com/emirpasic/gods v1.18.1
 	github.com/gin-gonic/gin v1.9.1
 	github.com/go-openapi/errors v0.22.0
 	github.com/go-openapi/strfmt v0.23.0
@@ -15,7 +16,6 @@ require (
 )
 
 require (
-	github.com/Bloodmain/validator v1.0.3
 	github.com/bytedance/sonic v1.9.1 // indirect
 	github.com/chenzhuoyu/base64x v0.0.0-20221115062448-fe3a3abad311 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.2 // indirect
