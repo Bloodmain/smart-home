@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"homework/internal/domain"
+	"time"
 )
 
 type Event struct {
