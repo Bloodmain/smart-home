@@ -3,12 +3,13 @@ package inmemory
 import (
 	"context"
 	"errors"
-	"github.com/emirpasic/gods/trees/redblacktree"
 	"homework/internal/domain"
 	"homework/internal/usecase"
 	"slices"
 	"sync"
 	"time"
+
+	"github.com/emirpasic/gods/trees/redblacktree"
 )
 
 var ErrNilEventPointer = errors.New("nil event is provided")
@@ -35,8 +36,8 @@ func (r *EventRepository) SaveEvent(ctx context.Context, event *domain.Event) er
 	tree, has := r.events[SensorId(event.SensorID)]
 	if !has {
 		tree = redblacktree.NewWith(func(a, b interface{}) int {
-			s1 := a.(time.Time)
-			s2 := b.(time.Time)
+			s1, _ := a.(time.Time)
+			s2, _ := b.(time.Time)
 			return s1.Compare(s2)
 		})
 		r.events[SensorId(event.SensorID)] = tree
@@ -59,7 +60,7 @@ func (r *EventRepository) GetLastEventBySensorID(ctx context.Context, id int64) 
 	}
 	it := tree.Iterator()
 	it.Last()
-	v := it.Value().(domain.Event)
+	v, _ := it.Value().(domain.Event)
 	return &v, ctx.Err()
 }
 
@@ -95,7 +96,7 @@ func (r *EventRepository) GetHistoryBySensorID(ctx context.Context, id int64, fr
 
 	res := make([]*domain.Event, 0, resSize)
 	for i := lb; i < lb+resSize; i++ {
-		e := v[i].(domain.Event)
+		e, _ := v[i].(domain.Event)
 		res = append(res, &e)
 	}
 
