@@ -3,6 +3,7 @@ module homework
 go 1.22
 
 require (
+	github.com/emirpasic/gods v1.18.1
 	github.com/gin-gonic/gin v1.9.1
 	github.com/golang-migrate/migrate/v4 v4.17.1
 	github.com/golang/mock v1.6.0
