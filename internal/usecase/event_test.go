@@ -119,3 +119,51 @@ func Test_event_ReceiveEvent(t *testing.T) {
 		assert.NoError(t, err)
 	})
 }
+
+func Test_event_GetHistoryBySensorID(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	t.Run("err, event not found", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		er := NewMockEventRepository(ctrl)
+		er.EXPECT().GetHistoryBySensorID(ctx, gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(nil, ErrEventNotFound)
+
+		e := NewEvent(er, nil)
+
+		_, err := e.GetHistoryBySensorID(ctx, 0, time.Time{}, time.Time{})
+		assert.ErrorIs(t, err, ErrEventNotFound)
+	})
+
+	t.Run("ok, no error", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		sensorID := int64(12345)
+		size := 10
+		originalEvents := make([]*domain.Event, 0, size)
+		for i := 0; i < size; i++ {
+			event := &domain.Event{
+				Timestamp: time.Now(),
+				SensorID:  sensorID,
+				Payload:   int64(i),
+			}
+			originalEvents = append(originalEvents, event)
+			time.Sleep(10 * time.Millisecond)
+		}
+
+		er := NewMockEventRepository(ctrl)
+		er.EXPECT().GetHistoryBySensorID(ctx, gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(originalEvents, nil)
+
+		events, err := er.GetHistoryBySensorID(ctx, sensorID, time.Time{}, time.Now())
+		assert.NoError(t, err)
+		assert.NotNil(t, events)
+		assert.Equal(t, size, len(events))
+
+		for i, event := range events {
+			assert.Equal(t, originalEvents[i], event)
+		}
+	})
+}
