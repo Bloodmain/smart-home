@@ -2,13 +2,13 @@ package inmemory
 
 import (
 	"context"
+	"github.com/stretchr/testify/assert"
 	"homework/internal/domain"
 	"homework/internal/usecase"
+	"math/rand/v2"
 	"sync"
 	"testing"
 	"time"
-
-	"github.com/stretchr/testify/assert"
 )
 
 func TestEventRepository_SaveEvent(t *testing.T) {
@@ -297,6 +297,42 @@ func TestEventRepository_GetHistoryBySensorID(t *testing.T) {
 				got, err := tt.query(ctx, er, original)
 				tt.check(t, got, err, original)
 			})
+		}
+	})
+}
+
+func FuzzEventRepository_GetHistoryBySensorID(f *testing.F) {
+	f.Add(int64(223423), int64(95747433))
+
+	n := 100000
+	originalEvents := make([]*domain.Event, n)
+	er := NewEventRepository()
+
+	for i := 0; i < n; i++ {
+		event := &domain.Event{
+			Timestamp: time.Unix(rand.Int64(), 0),
+			SensorID:  12345,
+			Payload:   int64(i),
+		}
+		originalEvents[i] = event
+		_ = er.SaveEvent(context.Background(), event)
+	}
+
+	f.Fuzz(func(t *testing.T, from, to int64) {
+		events, err := er.GetHistoryBySensorID(context.Background(), 12345, time.Unix(from, 0), time.Unix(to, 0))
+
+		assert.NoError(t, err)
+		assert.NotNil(t, events)
+
+		for _, event := range events {
+			assert.LessOrEqual(t, from, event.Timestamp.Unix())
+			assert.GreaterOrEqual(t, to, event.Timestamp.Unix())
+		}
+
+		for _, event := range originalEvents {
+			if from <= event.Timestamp.Unix() && event.Timestamp.Unix() <= to {
+				assert.Contains(t, events, event)
+			}
 		}
 	})
 }
