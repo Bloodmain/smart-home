@@ -2,14 +2,13 @@ package inmemory
 
 import (
 	"context"
+	"github.com/stretchr/testify/assert"
 	"homework/internal/domain"
 	"homework/internal/usecase"
 	"math/rand/v2"
 	"sync"
 	"testing"
 	"time"
-
-	"github.com/stretchr/testify/assert"
 )
 
 func TestEventRepository_SaveEvent(t *testing.T) {
