@@ -175,200 +175,128 @@ func TestEventRepository_GetHistoryBySensorID(t *testing.T) {
 		assert.ErrorIs(t, err, usecase.ErrEventNotFound)
 	})
 
-	t.Run("ok, save and get all events", func(t *testing.T) {
-		er := NewEventRepository()
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+	t.Run("ok, validate results", func(t *testing.T) {
+		tests := []struct {
+			name  string
+			n     int
+			query func(ctx context.Context, er *EventRepository, originalEvents []*domain.Event) ([]*domain.Event, error)
+			check func(t *testing.T, events []*domain.Event, err error, originalEvents []*domain.Event)
+		}{
+			{
+				name: "all events",
+				n:    10,
+				query: func(ctx context.Context, er *EventRepository, _ []*domain.Event) ([]*domain.Event, error) {
+					return er.GetHistoryBySensorID(ctx, 12345, time.Time{}, time.Now())
+				},
+				check: func(t *testing.T, events []*domain.Event, err error, originalEvents []*domain.Event) {
+					assert.NoError(t, err)
+					assert.NotNil(t, events)
+					assert.Equal(t, len(originalEvents), len(events))
 
-		sensorID := int64(12345)
-		size := 10
-		originalEvents := make([]*domain.Event, 0, size)
+					for i, event := range events {
+						assert.Equal(t, originalEvents[i], event)
+					}
+				},
+			},
+			{
+				name: "segment including bounds",
+				n:    10,
+				query: func(ctx context.Context, er *EventRepository, originalEvents []*domain.Event) ([]*domain.Event, error) {
+					return er.GetHistoryBySensorID(ctx, 12345, originalEvents[1].Timestamp, originalEvents[5].Timestamp)
+				},
+				check: func(t *testing.T, events []*domain.Event, err error, originalEvents []*domain.Event) {
+					assert.NoError(t, err)
+					assert.NotNil(t, events)
+					assert.Equal(t, 5, len(events))
 
-		for i := 0; i < size; i++ {
-			event := &domain.Event{
-				Timestamp: time.Now(),
-				SensorID:  sensorID,
-				Payload:   int64(i),
+					for i, event := range events {
+						assert.Equal(t, originalEvents[1+i], event)
+					}
+				},
+			},
+			{
+				name: "segment excluding bounds",
+				n:    10,
+				query: func(ctx context.Context, er *EventRepository, originalEvents []*domain.Event) ([]*domain.Event, error) {
+					from := originalEvents[1].Timestamp.Add(5 * time.Millisecond)
+					to := originalEvents[5].Timestamp.Add(-5 * time.Millisecond)
+					return er.GetHistoryBySensorID(ctx, 12345, from, to)
+				},
+				check: func(t *testing.T, events []*domain.Event, err error, originalEvents []*domain.Event) {
+					assert.NoError(t, err)
+					assert.NotNil(t, events)
+					assert.Equal(t, 3, len(events))
+
+					for i, event := range events {
+						assert.Equal(t, originalEvents[2+i], event)
+					}
+				},
+			},
+			{
+				name: "from = to",
+				n:    10,
+				query: func(ctx context.Context, er *EventRepository, originalEvents []*domain.Event) ([]*domain.Event, error) {
+					return er.GetHistoryBySensorID(ctx, 12345, originalEvents[8].Timestamp, originalEvents[8].Timestamp)
+				},
+				check: func(t *testing.T, events []*domain.Event, err error, originalEvents []*domain.Event) {
+					assert.NoError(t, err)
+					assert.NotNil(t, events)
+					assert.Equal(t, 1, len(events))
+					assert.Equal(t, originalEvents[8], events[0])
+				},
+			},
+			{
+				name: "empty",
+				n:    10,
+				query: func(ctx context.Context, er *EventRepository, _ []*domain.Event) ([]*domain.Event, error) {
+					return er.GetHistoryBySensorID(ctx, 12345, time.Now(), time.Now().Add(10*time.Second))
+				},
+				check: func(t *testing.T, events []*domain.Event, err error, _ []*domain.Event) {
+					assert.NoError(t, err)
+					assert.NotNil(t, events)
+					assert.Equal(t, 0, len(events))
+				},
+			},
+			{
+				name: "from > to",
+				n:    10,
+				query: func(ctx context.Context, er *EventRepository, _ []*domain.Event) ([]*domain.Event, error) {
+					return er.GetHistoryBySensorID(ctx, 12345, time.Now(), time.Time{})
+				},
+				check: func(t *testing.T, events []*domain.Event, err error, _ []*domain.Event) {
+					assert.NoError(t, err)
+					assert.NotNil(t, events)
+					assert.Equal(t, 0, len(events))
+				},
+			},
+		}
+
+		setupEvents := func(n int, er *EventRepository) []*domain.Event {
+			originalEvents := make([]*domain.Event, n)
+
+			for i := 0; i < n; i++ {
+				event := &domain.Event{
+					Timestamp: time.Now(),
+					SensorID:  12345,
+					Payload:   int64(i),
+				}
+				originalEvents[i] = event
+				time.Sleep(10 * time.Millisecond)
+				assert.NoError(t, er.SaveEvent(context.Background(), event))
 			}
-			originalEvents = append(originalEvents, event)
-			time.Sleep(10 * time.Millisecond)
-			assert.NoError(t, er.SaveEvent(ctx, event))
+			return originalEvents
 		}
 
-		for i := 0; i < 10; i++ {
-			event := &domain.Event{
-				Timestamp: time.Now(),
-				SensorID:  54321,
-				Payload:   0,
-			}
-			assert.NoError(t, er.SaveEvent(ctx, event))
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				er := NewEventRepository()
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+
+				original := setupEvents(tt.n, er)
+				got, err := tt.query(ctx, er, original)
+				tt.check(t, got, err, original)
+			})
 		}
-
-		events, err := er.GetHistoryBySensorID(ctx, sensorID, time.Time{}, time.Now())
-		assert.NoError(t, err)
-		assert.NotNil(t, events)
-		assert.Equal(t, size, len(events))
-
-		for i, event := range events {
-			assert.Equal(t, originalEvents[i], event)
-		}
-	})
-
-	t.Run("ok, save and get segment including bounds", func(t *testing.T) {
-		er := NewEventRepository()
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
-		sensorID := int64(12345)
-		size := 10
-		originalEvents := make([]*domain.Event, 0, size)
-
-		for i := 0; i < size; i++ {
-			event := &domain.Event{
-				Timestamp: time.Now(),
-				SensorID:  sensorID,
-				Payload:   int64(i),
-			}
-			originalEvents = append(originalEvents, event)
-			time.Sleep(10 * time.Millisecond)
-			assert.NoError(t, er.SaveEvent(ctx, event))
-		}
-
-		for i := 0; i < 10; i++ {
-			event := &domain.Event{
-				Timestamp: time.Now(),
-				SensorID:  54321,
-				Payload:   0,
-			}
-			assert.NoError(t, er.SaveEvent(ctx, event))
-		}
-
-		events, err := er.GetHistoryBySensorID(ctx, sensorID, originalEvents[1].Timestamp, originalEvents[5].Timestamp)
-		assert.NoError(t, err)
-		assert.NotNil(t, events)
-		assert.Equal(t, 5, len(events))
-
-		for i, event := range events {
-			assert.Equal(t, originalEvents[1+i], event)
-		}
-	})
-
-	t.Run("ok, save and get segment excluding bounds", func(t *testing.T) {
-		er := NewEventRepository()
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
-		sensorID := int64(12345)
-		size := 10
-		originalEvents := make([]*domain.Event, 0, size)
-
-		for i := 0; i < size; i++ {
-			event := &domain.Event{
-				Timestamp: time.Now(),
-				SensorID:  sensorID,
-				Payload:   int64(i),
-			}
-			originalEvents = append(originalEvents, event)
-			time.Sleep(10 * time.Millisecond)
-			assert.NoError(t, er.SaveEvent(ctx, event))
-		}
-
-		for i := 0; i < 10; i++ {
-			event := &domain.Event{
-				Timestamp: time.Now(),
-				SensorID:  54321,
-				Payload:   0,
-			}
-			assert.NoError(t, er.SaveEvent(ctx, event))
-		}
-
-		from := originalEvents[1].Timestamp.Add(5 * time.Millisecond)
-		to := originalEvents[5].Timestamp.Add(-5 * time.Millisecond)
-		events, err := er.GetHistoryBySensorID(ctx, sensorID, from, to)
-		assert.NoError(t, err)
-		assert.NotNil(t, events)
-		assert.Equal(t, 3, len(events))
-
-		for i, event := range events {
-			assert.Equal(t, originalEvents[2+i], event)
-		}
-	})
-
-	t.Run("ok, from = to", func(t *testing.T) {
-		er := NewEventRepository()
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
-		sensorID := int64(12345)
-		size := 10
-		originalEvents := make([]*domain.Event, 0, size)
-
-		for i := 0; i < size; i++ {
-			event := &domain.Event{
-				Timestamp: time.Now(),
-				SensorID:  sensorID,
-				Payload:   int64(i),
-			}
-			originalEvents = append(originalEvents, event)
-			time.Sleep(10 * time.Millisecond)
-			assert.NoError(t, er.SaveEvent(ctx, event))
-		}
-
-		for i := 0; i < 10; i++ {
-			event := &domain.Event{
-				Timestamp: time.Now(),
-				SensorID:  54321,
-				Payload:   0,
-			}
-			assert.NoError(t, er.SaveEvent(ctx, event))
-		}
-
-		events, err := er.GetHistoryBySensorID(ctx, sensorID, originalEvents[8].Timestamp, originalEvents[8].Timestamp)
-		assert.NoError(t, err)
-		assert.NotNil(t, events)
-		assert.Equal(t, 1, len(events))
-		assert.Equal(t, originalEvents[8], events[0])
-	})
-
-	t.Run("ok, empty", func(t *testing.T) {
-		er := NewEventRepository()
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
-		for i := 0; i < 10; i++ {
-			event := &domain.Event{
-				Timestamp: time.Now(),
-				SensorID:  1,
-				Payload:   int64(i),
-			}
-			time.Sleep(10 * time.Millisecond)
-			assert.NoError(t, er.SaveEvent(ctx, event))
-		}
-
-		events, err := er.GetHistoryBySensorID(ctx, 1, time.Now(), time.Now().Add(10*time.Second))
-		assert.NoError(t, err)
-		assert.NotNil(t, events)
-		assert.Equal(t, 0, len(events))
-	})
-
-	t.Run("ok, from > to", func(t *testing.T) {
-		er := NewEventRepository()
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
-		for i := 0; i < 10; i++ {
-			event := &domain.Event{
-				Timestamp: time.Now(),
-				SensorID:  1,
-				Payload:   int64(i),
-			}
-			time.Sleep(10 * time.Millisecond)
-			assert.NoError(t, er.SaveEvent(ctx, event))
-		}
-
-		events, err := er.GetHistoryBySensorID(ctx, 1, time.Now(), time.Time{})
-		assert.NoError(t, err)
-		assert.NotNil(t, events)
-		assert.Equal(t, 0, len(events))
 	})
 }
