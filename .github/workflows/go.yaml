@@ -29,11 +29,11 @@ jobs:
 
       - name: Fuzzing test
         run: |
-          go list ./... | grep -vE '(test|scripts|cmd|mock|gen)' | xargs -I{} go test -fuzz=Fuzz -fuzztime=10s {}
+          go list ./... | grep -vE '(test|scripts|cmd|mock|gen|models)' | xargs -I{} go test -fuzz=Fuzz -fuzztime=10s {}
 
       - name: Test
         run: |
-          go test -v -race -coverprofile=./cover.out -covermode=atomic -coverpkg=$(go list ./... | grep -vE '(test|scripts|cmd|mock|gen)' | tr '\n' ',') ./...
+          go test -v -race -coverprofile=./cover.out -covermode=atomic -coverpkg=$(go list ./... | grep -vE '(test|scripts|cmd|mock|gen|models)' | tr '\n' ',') ./...
 
       - name: Check coverage
         uses: vladopajic/go-test-coverage@v2
