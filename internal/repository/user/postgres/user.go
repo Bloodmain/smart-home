@@ -2,8 +2,13 @@ package postgres
 
 import (
 	"context"
-	"github.com/jackc/pgx/v5/pgxpool"
+	"errors"
+	"fmt"
 	"homework/internal/domain"
+	"homework/internal/usecase"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type UserRepository struct {
@@ -16,12 +21,28 @@ func NewUserRepository(pool *pgxpool.Pool) *UserRepository {
 	}
 }
 
+const saveEventQuery = `insert into db.public.users (NAME) values ($1);`
+
 func (r *UserRepository) SaveUser(ctx context.Context, user *domain.User) error {
-	// TODO добавьте реализацию
-	return nil
+	_, err := r.pool.Exec(ctx, saveEventQuery, user.Name)
+	if err != nil {
+		return err
+	}
+	return ctx.Err()
 }
 
+const getUserByIDQuery = `select id, name from db.public.users where id=$1`
+
 func (r *UserRepository) GetUserByID(ctx context.Context, id int64) (*domain.User, error) {
-	// TODO добавьте реализацию
-	return nil, nil
+	row := r.pool.QueryRow(ctx, getUserByIDQuery, id)
+
+	user := &domain.User{}
+	if err := row.Scan(&user.ID, &user.Name); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, usecase.ErrUserNotFound
+		}
+		return nil, fmt.Errorf("can't scan user: %w", err)
+	}
+
+	return user, ctx.Err()
 }
