@@ -38,6 +38,7 @@ func setupRouter(r *gin.Engine, uc UseCases, ws *WebSocketHandler) {
 	r.OPTIONS("/users/:user_id/sensors", setupOptionsUserIdHandler())
 	r.GET("/users/:user_id/sensors", setupGetUserIdHandler(uc))
 	r.GET("/sensors/:sensor_id/events", setupGetSensorEventHandler(ws))
+	r.GET("/sensors/:sensor_id/history", setupGetSensorHistory(uc))
 }
 
 func setupGetSensorEventHandler(ws *WebSocketHandler) gin.HandlerFunc {
@@ -55,6 +56,59 @@ func setupGetSensorEventHandler(ws *WebSocketHandler) gin.HandlerFunc {
 				ctx.AbortWithStatus(http.StatusInternalServerError)
 			}
 		}
+	}
+}
+
+func parseQueryTimestamp(ctx *gin.Context, query string) (time.Time, bool) {
+	qRaw, has := ctx.GetQuery(query)
+	if !has {
+		return time.Time{}, false
+	}
+	q, err := strconv.ParseInt(qRaw, 10, 64)
+	if err != nil || q < 0 {
+		return time.Time{}, false
+	}
+	return time.Unix(q, 0), true
+}
+
+func setupGetSensorHistory(uc UseCases) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		if !checkAccept(ctx) {
+			return
+		}
+
+		id, err := strconv.ParseInt(ctx.Param("sensor_id"), 10, 64)
+		if err != nil {
+			ctx.AbortWithStatus(http.StatusUnprocessableEntity)
+			return
+		}
+
+		from, ok1 := parseQueryTimestamp(ctx, "start_date")
+		to, ok2 := parseQueryTimestamp(ctx, "end_date")
+		if !ok1 || !ok2 {
+			ctx.AbortWithStatus(http.StatusBadRequest)
+			return
+		}
+
+		events, err := uc.Event.GetHistoryBySensorID(ctx, id, from, to)
+		if err != nil {
+			if errors.Is(err, usecase.ErrEventNotFound) {
+				ctx.AbortWithStatus(http.StatusNotFound)
+			} else {
+				ctx.AbortWithStatus(http.StatusInternalServerError)
+			}
+			return
+		}
+
+		dtos := make([]models.HistoryEvent, len(events))
+		for i, it := range events {
+			unixTime := it.Timestamp.Unix()
+			dtos[i] = models.HistoryEvent{
+				Timestamp: &unixTime,
+				Payload:   &it.Payload,
+			}
+		}
+		ctx.JSON(http.StatusOK, dtos)
 	}
 }
 

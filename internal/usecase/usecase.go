@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"homework/internal/domain"
+	"time"
 )
 
 var (
@@ -33,6 +34,7 @@ type EventRepository interface {
 	SaveEvent(ctx context.Context, event *domain.Event) error
 	// GetLastEventBySensorID - функция получения последнего события по ID датчика
 	GetLastEventBySensorID(ctx context.Context, id int64) (*domain.Event, error)
+	GetHistoryBySensorID(ctx context.Context, id int64, from, to time.Time) ([]*domain.Event, error)
 }
 
 type UserRepository interface {

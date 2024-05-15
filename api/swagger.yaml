@@ -161,6 +161,49 @@ paths:
           description: Ошибка исполнения
           schema:
             $ref: "#/definitions/Error"
+  /sensors/{sensor_id}/history:
+    get:
+      summary: Получение истории датчика
+      description: Возвращает все события датчикав заданном диапазоне
+      operationId: getHistory
+      tags:
+        - sensors
+      produces:
+        - application/json
+      parameters:
+        - name: "sensor_id"
+          in: "path"
+          description: "Идентификатор датчика"
+          required: true
+          type: "integer"
+          format: "int64"
+        - name: "start_date"
+          in: "query"
+          description: "Начало временного интервала"
+          required: true
+          type: "integer"
+          format: "int64"
+        - name: "end_date"
+          in: "query"
+          description: "Конец временного интервала"
+          required: true
+          type: "integer"
+          format: "int64"
+      responses:
+        "200":
+          description: Успех
+          schema:
+            $ref: "#/definitions/Sensor"
+        "404":
+          description: Датчик с указанным идентификатором не найден
+        "422":
+          description: Идентификатор датчика не валиден
+        "406":
+          description: Запрошен неподдерживаемый формат тела ответа
+        default:
+          description: Ошибка исполнения
+          schema:
+            $ref: "#/definitions/Error"
   /sensors/{sensor_id}:
     get:
       summary: Получение датчика
@@ -196,13 +239,6 @@ paths:
       summary: Запрос заголовков
       description: Возвращает заголовки ответа GET
       operationId: headSensor
-      parameters:
-        - name: "sensor_id"
-          in: "path"
-          description: "Идентификатор сенсора"
-          required: true
-          type: "integer"
-          format: "int64"
       tags:
         - sensors
       parameters:
@@ -229,13 +265,6 @@ paths:
       summary: Получение доступных методов
       description: Возвращает в заголовке Allow список доступных методов
       operationId: sensorOptions
-      parameters:
-        - name: "sensor_id"
-          in: "path"
-          description: "Идентификатор сенсора"
-          required: true
-          type: "integer"
-          format: "int64"
       tags:
         - sensors
       parameters:
@@ -407,13 +436,6 @@ paths:
       summary: Получение доступных методов
       description: Возвращает в заголовке Allow список доступных методов
       operationId: usersSensorsOptions
-      parameters:
-        - name: "user_id"
-          in: "path"
-          description: "Идентификатор пользователя"
-          required: true
-          type: "integer"
-          format: "int64"
       tags:
         - users
       parameters:
@@ -600,4 +622,23 @@ definitions:
       - payload
     example:
       sensor_serial_number: "1234567890"
+      payload: 10
+  HistoryEvent:
+    title: HistoryEvent
+    description: Событие-история датчика
+    type: object
+    properties:
+      timestamp:
+        description: Временная метка
+        type: integer
+        format: int64
+      payload:
+        description: Информация от датчика
+        type: integer
+        format: int64
+    required:
+      - timestamp
+      - payload
+    example:
+      timestamp: 813798132
       payload: 10
