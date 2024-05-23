@@ -65,7 +65,7 @@ func main() {
 	}
 
 	if port == MetricsPort {
-		log.Fatalf("Port number clases with metrics port: %s\n", portRaw)
+		log.Fatalf("Port number clashes with metrics port: %s\n", portRaw)
 		return
 	}
 
