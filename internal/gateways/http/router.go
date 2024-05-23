@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/go-openapi/strfmt"
@@ -46,9 +47,27 @@ func latencyHandler() gin.HandlerFunc {
 	}
 }
 
+type WebsocketMetric struct {
+	activeWebsockets atomic.Int64
+}
+
+func (wm *WebsocketMetric) updateMetric(delta int64) {
+	log.Printf("Websocket active: %v", wm.activeWebsockets.Add(delta))
+}
+
+func (wm *WebsocketMetric) addConnection() {
+	wm.updateMetric(1)
+}
+
+func (wm *WebsocketMetric) removeConnection() {
+	wm.updateMetric(-1)
+}
+
 func setupRouter(r *gin.Engine, uc UseCases, ws *WebSocketHandler) {
 	r.HandleMethodNotAllowed = true
 	r.Use(errorHandler(), occurrenceHandler(), latencyHandler())
+
+	wm := &WebsocketMetric{}
 
 	r.POST("/events", setupPostEventHandler(uc))
 	r.OPTIONS("/events", setupOptionsEventHandler())
@@ -65,17 +84,20 @@ func setupRouter(r *gin.Engine, uc UseCases, ws *WebSocketHandler) {
 	r.HEAD("/users/:user_id/sensors", setupHeadUserIdHandler(uc))
 	r.OPTIONS("/users/:user_id/sensors", setupOptionsUserIdHandler())
 	r.GET("/users/:user_id/sensors", setupGetUserIdHandler(uc))
-	r.GET("/sensors/:sensor_id/events", setupGetSensorEventHandler(ws))
+	r.GET("/sensors/:sensor_id/events", setupGetSensorEventHandler(ws, wm))
 	r.GET("/sensors/:sensor_id/history", setupGetSensorHistory(uc))
 }
 
-func setupGetSensorEventHandler(ws *WebSocketHandler) gin.HandlerFunc {
+func setupGetSensorEventHandler(ws *WebSocketHandler, wm *WebsocketMetric) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		id, err := strconv.ParseInt(ctx.Param("sensor_id"), 10, 64)
 		if err != nil {
 			ctx.AbortWithStatus(http.StatusUnprocessableEntity)
 			return
 		}
+
+		wm.addConnection()
+		defer wm.removeConnection()
 
 		if err := ws.Handle(ctx, id); err != nil {
 			if errors.Is(err, usecase.ErrSensorNotFound) {
