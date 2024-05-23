@@ -8,6 +8,7 @@ import (
 	"homework/internal/gateways/http/models"
 	"homework/internal/usecase"
 	"io"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -19,8 +20,35 @@ import (
 	"github.com/jeanfric/goembed/countingwriter"
 )
 
+func errorHandler() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Next()
+		for _, err := range c.Errors {
+			// Can instead store in a database or whatever
+			log.Printf("Error: %v", err)
+		}
+	}
+}
+
+func occurrenceHandler() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		log.Printf("Request accepted")
+		c.Next()
+	}
+}
+
+func latencyHandler() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		t := time.Now()
+		c.Next()
+		latency := time.Since(t)
+		log.Printf("Latency: %v", latency)
+	}
+}
+
 func setupRouter(r *gin.Engine, uc UseCases, ws *WebSocketHandler) {
 	r.HandleMethodNotAllowed = true
+	r.Use(errorHandler(), occurrenceHandler(), latencyHandler())
 
 	r.POST("/events", setupPostEventHandler(uc))
 	r.OPTIONS("/events", setupOptionsEventHandler())
