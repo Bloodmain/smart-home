@@ -14,7 +14,26 @@ import (
 	eventRepository "homework/internal/repository/event/inmemory"
 	sensorRepository "homework/internal/repository/sensor/inmemory"
 	userRepository "homework/internal/repository/user/inmemory"
+
+	_ "github.com/prometheus/client_golang/prometheus/promauto"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
+
+const (
+	MetricsAddr = "/metrics"
+	MetricsPort = 8000
+)
+
+func runMetrics() {
+	metricServer := http.NewServeMux()
+	metricServer.Handle(MetricsAddr, promhttp.Handler())
+
+	log.Printf("Listening metrics on :%d", MetricsPort)
+	err := http.ListenAndServe(":"+strconv.Itoa(MetricsPort), metricServer)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
 
 func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
@@ -42,7 +61,15 @@ func main() {
 	}
 	if err != nil || port < 0 || port > 9999 {
 		log.Fatalf("invalid port number: %s\n", portRaw)
+		return
 	}
+
+	if port == MetricsPort {
+		log.Fatalf("Port number clases with metrics port: %s\n", portRaw)
+		return
+	}
+
+	go runMetrics()
 
 	r := httpGateway.NewServer(useCases, httpGateway.WithHost(host), httpGateway.WithPort(uint16(port)))
 	if err := r.Run(ctx); err != nil && !errors.Is(err, http.ErrServerClosed) {
