@@ -10,6 +10,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -63,11 +64,46 @@ func (wm *WebsocketMetric) removeConnection() {
 	wm.updateMetric(-1)
 }
 
+type ReadWriteMetric struct {
+	reads  atomic.Int64
+	writes atomic.Int64
+}
+
+func (rwm *ReadWriteMetric) updateMetric() {
+	ratio := float64(rwm.reads.Load()) / float64(rwm.writes.Load()) // +inf if writes is 0
+	log.Printf("Reads/writes ratio: %v", ratio)
+}
+
+func (rwm *ReadWriteMetric) addRead() {
+	rwm.reads.Add(1)
+	rwm.updateMetric()
+}
+
+func (rwm *ReadWriteMetric) addWrite() {
+	rwm.writes.Add(1)
+	rwm.updateMetric()
+}
+
+func readWriteMetrics(rwm *ReadWriteMetric) gin.HandlerFunc {
+	writesMethods := []string{"POST", "PUT", "PATCH", "DELETE"}
+
+	return func(c *gin.Context) {
+		if slices.IndexFunc(writesMethods, func(arg string) bool { return arg == c.Request.Method }) >= 0 {
+			rwm.addWrite()
+		} else {
+			rwm.addRead()
+		}
+		c.Next()
+	}
+}
+
 func setupRouter(r *gin.Engine, uc UseCases, ws *WebSocketHandler) {
 	r.HandleMethodNotAllowed = true
 	r.Use(errorHandler(), occurrenceHandler(), latencyHandler())
 
 	wm := &WebsocketMetric{}
+	rwm := &ReadWriteMetric{}
+	r.Use(readWriteMetrics(rwm))
 
 	r.POST("/events", setupPostEventHandler(uc))
 	r.OPTIONS("/events", setupOptionsEventHandler())
