@@ -16,8 +16,6 @@ var ErrNilEventPointer = errors.New("nil event is provided")
 
 type SensorId int64
 
-type SensorId int64
-
 type EventRepository struct {
 	// maps sensor to all of its event compared by timestamps
 	events map[SensorId]*redblacktree.Tree

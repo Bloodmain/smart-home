@@ -3,26 +3,26 @@ package http
 import (
 	"bytes"
 	"encoding/json"
+	eventRepository "homework/internal/repository/event/inmemory"
+	sensorRepository "homework/internal/repository/sensor/inmemory"
+	userRepository "homework/internal/repository/user/inmemory"
 	"homework/internal/usecase"
-	"homework/pkg/pg_test"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
-
-	eventRepository "homework/internal/repository/event/postgres"
-	sensorRepository "homework/internal/repository/sensor/postgres"
-	userRepository "homework/internal/repository/user/postgres"
 )
 
 var (
-	er  = &eventRepository.EventRepository{}
-	sr  = &sensorRepository.SensorRepository{}
-	ur  = &userRepository.UserRepository{}
-	sor = &userRepository.SensorOwnerRepository{}
+	er  = eventRepository.NewEventRepository()
+	sr  = sensorRepository.NewSensorRepository()
+	ur  = userRepository.NewUserRepository()
+	sor = userRepository.NewSensorOwnerRepository()
 )
 
 var useCases = UseCases{
@@ -34,14 +34,6 @@ var useCases = UseCases{
 var router = gin.Default()
 
 func init() {
-	testDB := pg_test.SetupTestDatabase()
-	testDbInstance := testDB.DbInstance
-
-	*er = *eventRepository.NewEventRepository(testDbInstance)
-	*sr = *sensorRepository.NewSensorRepository(testDbInstance)
-	*ur = *userRepository.NewUserRepository(testDbInstance)
-	*sor = *userRepository.NewSensorOwnerRepository(testDbInstance)
-
 	setupRouter(router, useCases, NewWebSocketHandler(useCases))
 }
 
@@ -740,5 +732,98 @@ func TestEventsRoutes(t *testing.T) {
 				// assert.Contains(t, allowed, http.MethodPost, "В разрешённых методах нет POST")
 			})
 		}
+	})
+}
+
+// Тесты /sensors/{sensor_id}/history
+func TestSensorsHistory(t *testing.T) {
+	t.Run("success_200", func(t *testing.T) {
+		w := httptest.NewRecorder()
+
+		req, _ := http.NewRequest(http.MethodGet, "/sensors/1/history?start_date=0&end_date="+strconv.FormatInt(time.Now().Unix(), 10), nil)
+		req.Header.Add("Accept", "application/json")
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusOK, w.Code, "Получили в ответ не тот код")
+		assert.True(t, json.Valid(w.Body.Bytes()), "В ответе не json")
+	})
+
+	t.Run("requested_unsupported_body_format_406", func(t *testing.T) {
+		w := httptest.NewRecorder()
+
+		req, _ := http.NewRequest(http.MethodGet, "/sensors/1/history?start_date=0&end_date=1", nil)
+		req.Header.Add("Accept", "application/xml")
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusNotAcceptable, w.Code, "Получили в ответ не тот код")
+	})
+
+	t.Run("OTHER_sensors_history_405", func(t *testing.T) {
+		tests := []struct {
+			name  string
+			input string
+			want  int
+		}{
+			{http.MethodPut, http.MethodPut, http.StatusMethodNotAllowed},
+			{http.MethodOptions, http.MethodOptions, http.StatusMethodNotAllowed},
+			{http.MethodPost, http.MethodPost, http.StatusMethodNotAllowed},
+			{http.MethodHead, http.MethodHead, http.StatusMethodNotAllowed},
+			{http.MethodDelete, http.MethodDelete, http.StatusMethodNotAllowed},
+			{http.MethodPatch, http.MethodPatch, http.StatusMethodNotAllowed},
+			{http.MethodConnect, http.MethodConnect, http.StatusMethodNotAllowed},
+			{http.MethodTrace, http.MethodTrace, http.StatusMethodNotAllowed},
+		}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				w := httptest.NewRecorder()
+				req, _ := http.NewRequest(tt.input, "/sensors/1/history?start_date=0&end_date=1", nil)
+				router.ServeHTTP(w, req)
+
+				assert.Equal(t, tt.want, w.Code, "Получили в ответ не тот код")
+				// allowed := strings.Split(w.Header().Get("Allow"), ",")
+				// assert.Contains(t, allowed, http.MethodOptions, "В разрешённых методах нет OPTIONS")
+				// assert.Contains(t, allowed, http.MethodPost, "В разрешённых методах нет POST")
+			})
+		}
+	})
+
+	t.Run("id_has_invalid_format_422", func(t *testing.T) {
+		w := httptest.NewRecorder()
+
+		req, _ := http.NewRequest(http.MethodGet, "/sensors/abc/history?start_date=0&end_date=1", nil)
+		req.Header.Add("Accept", "application/json")
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusUnprocessableEntity, w.Code, "Получили в ответ не тот код")
+	})
+
+	t.Run("id_has_invalid_timestamps", func(t *testing.T) {
+		w := httptest.NewRecorder()
+
+		req, _ := http.NewRequest(http.MethodGet, "/sensors/1/history?start_date=-1&end_date=1", nil)
+		req.Header.Add("Accept", "application/json")
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code, "Получили в ответ не тот код")
+	})
+
+	t.Run("id_has_missing_start_date", func(t *testing.T) {
+		w := httptest.NewRecorder()
+
+		req, _ := http.NewRequest(http.MethodGet, "/sensors/1/history?end_date=1", nil)
+		req.Header.Add("Accept", "application/json")
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code, "Получили в ответ не тот код")
+	})
+
+	t.Run("id_has_missing_timestamps", func(t *testing.T) {
+		w := httptest.NewRecorder()
+
+		req, _ := http.NewRequest(http.MethodGet, "/sensors/1/history", nil)
+		req.Header.Add("Accept", "application/json")
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code, "Получили в ответ не тот код")
 	})
 }

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"homework/internal/usecase"
 	"log"
 	"net/http"
 	"os"
@@ -15,7 +16,6 @@ import (
 	eventRepository "homework/internal/repository/event/postgres"
 	sensorRepository "homework/internal/repository/sensor/postgres"
 	userRepository "homework/internal/repository/user/postgres"
-	"strconv"
 )
 
 func main() {
