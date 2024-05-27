@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
 	"homework/internal/domain"
 	"homework/internal/gateways/http/models"
 	"homework/internal/usecase"
@@ -16,6 +14,9 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 
 	"github.com/go-openapi/strfmt"
 
@@ -142,7 +143,7 @@ func setupGetSensorEventHandler(ws *WebSocketHandler, me *MetricsExporter) gin.H
 			return
 		}
 
-		var gauge = me.activeWebsockets.WithLabelValues(ctx.FullPath())
+		gauge := me.activeWebsockets.WithLabelValues(ctx.FullPath())
 		gauge.Inc()
 		defer gauge.Dec()
 
