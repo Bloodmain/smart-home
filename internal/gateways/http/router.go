@@ -15,7 +15,6 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"sync/atomic"
 	"time"
 
 	"github.com/go-openapi/strfmt"
@@ -24,14 +23,22 @@ import (
 	"github.com/jeanfric/goembed/countingwriter"
 )
 
-type redMetrics struct {
+type MetricsExporter struct {
+	// red metrics
 	totalRequests   *prometheus.CounterVec
 	requestDuration *prometheus.HistogramVec
 	requestsErrors  *prometheus.CounterVec
+
+	// websocket metrics
+	activeWebsockets *prometheus.GaugeVec
+
+	// read/write metrics
+	totalReads  *prometheus.CounterVec
+	totalWrites *prometheus.CounterVec
 }
 
-func newRedMetrics() *redMetrics {
-	metrics := &redMetrics{
+func newMetricsExporter() *MetricsExporter {
+	metrics := &MetricsExporter{
 		totalRequests: promauto.NewCounterVec(prometheus.CounterOpts{
 			Name: "total_requests",
 			Help: "Counts all requests by path",
@@ -44,11 +51,30 @@ func newRedMetrics() *redMetrics {
 			Name: "requests_errors",
 			Help: "Counts all errors by path",
 		}, []string{"path"}),
+
+		activeWebsockets: promauto.NewGaugeVec(prometheus.GaugeOpts{
+			Name: "active_websockets",
+			Help: "Represents active websockets on the path",
+		}, []string{"path"}),
+
+		totalReads: promauto.NewCounterVec(prometheus.CounterOpts{
+			Name: "total_reads",
+			Help: "Counts all reads requests by path",
+		}, []string{"path"}),
+		totalWrites: promauto.NewCounterVec(prometheus.CounterOpts{
+			Name: "total_writes",
+			Help: "Counts all writes requests by path",
+		}, []string{"path"}),
 	}
 
-	err := errors.Join(prometheus.Register(metrics.totalRequests),
+	err := errors.Join(
+		prometheus.Register(metrics.totalRequests),
 		prometheus.Register(metrics.requestDuration),
-		prometheus.Register(metrics.requestsErrors))
+		prometheus.Register(metrics.requestsErrors),
+		prometheus.Register(metrics.activeWebsockets),
+		prometheus.Register(metrics.totalReads),
+		prometheus.Register(metrics.totalWrites),
+	)
 	if err != nil {
 		log.Printf("Cant register metrics: %v", err)
 	}
@@ -56,63 +82,27 @@ func newRedMetrics() *redMetrics {
 	return metrics
 }
 
-func redMetricsHandler(metrics *redMetrics) gin.HandlerFunc {
+func redMetricsHandler(me *MetricsExporter) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		t := prometheus.NewTimer(metrics.requestDuration.WithLabelValues(c.FullPath()))
+		t := prometheus.NewTimer(me.requestDuration.WithLabelValues(c.FullPath()))
 		c.Next()
 		t.ObserveDuration()
 
-		metrics.totalRequests.WithLabelValues(c.FullPath()).Inc()
+		me.totalRequests.WithLabelValues(c.FullPath()).Inc()
 		for range c.Errors {
-			metrics.requestsErrors.WithLabelValues(c.FullPath()).Inc()
+			me.requestsErrors.WithLabelValues(c.FullPath()).Inc()
 		}
 	}
 }
 
-type WebsocketMetric struct {
-	activeWebsockets atomic.Int64
-}
-
-func (wm *WebsocketMetric) updateMetric(delta int64) {
-	log.Printf("Websocket active: %v", wm.activeWebsockets.Add(delta))
-}
-
-func (wm *WebsocketMetric) addConnection() {
-	wm.updateMetric(1)
-}
-
-func (wm *WebsocketMetric) removeConnection() {
-	wm.updateMetric(-1)
-}
-
-type ReadWriteMetric struct {
-	reads  atomic.Int64
-	writes atomic.Int64
-}
-
-func (rwm *ReadWriteMetric) updateMetric() {
-	ratio := float64(rwm.reads.Load()) / float64(rwm.writes.Load()) // +inf if writes is 0
-	log.Printf("Reads/writes ratio: %v", ratio)
-}
-
-func (rwm *ReadWriteMetric) addRead() {
-	rwm.reads.Add(1)
-	rwm.updateMetric()
-}
-
-func (rwm *ReadWriteMetric) addWrite() {
-	rwm.writes.Add(1)
-	rwm.updateMetric()
-}
-
-func readWriteMetrics(rwm *ReadWriteMetric) gin.HandlerFunc {
+func readWriteMetrics(me *MetricsExporter) gin.HandlerFunc {
 	writesMethods := []string{"POST", "PUT", "PATCH", "DELETE"}
 
 	return func(c *gin.Context) {
 		if slices.IndexFunc(writesMethods, func(arg string) bool { return arg == c.Request.Method }) >= 0 {
-			rwm.addWrite()
+			me.totalWrites.WithLabelValues(c.FullPath()).Inc()
 		} else {
-			rwm.addRead()
+			me.totalReads.WithLabelValues(c.FullPath()).Inc()
 		}
 		c.Next()
 	}
@@ -120,12 +110,10 @@ func readWriteMetrics(rwm *ReadWriteMetric) gin.HandlerFunc {
 
 func setupRouter(r *gin.Engine, uc UseCases, ws *WebSocketHandler) {
 	r.HandleMethodNotAllowed = true
-	rm := newRedMetrics()
-	r.Use(redMetricsHandler(rm))
+	me := newMetricsExporter()
 
-	wm := &WebsocketMetric{}
-	rwm := &ReadWriteMetric{}
-	r.Use(readWriteMetrics(rwm))
+	r.Use(redMetricsHandler(me))
+	r.Use(readWriteMetrics(me))
 
 	r.POST("/events", setupPostEventHandler(uc))
 	r.OPTIONS("/events", setupOptionsEventHandler())
@@ -142,11 +130,11 @@ func setupRouter(r *gin.Engine, uc UseCases, ws *WebSocketHandler) {
 	r.HEAD("/users/:user_id/sensors", setupHeadUserIdHandler(uc))
 	r.OPTIONS("/users/:user_id/sensors", setupOptionsUserIdHandler())
 	r.GET("/users/:user_id/sensors", setupGetUserIdHandler(uc))
-	r.GET("/sensors/:sensor_id/events", setupGetSensorEventHandler(ws, wm))
+	r.GET("/sensors/:sensor_id/events", setupGetSensorEventHandler(ws, me))
 	r.GET("/sensors/:sensor_id/history", setupGetSensorHistory(uc))
 }
 
-func setupGetSensorEventHandler(ws *WebSocketHandler, wm *WebsocketMetric) gin.HandlerFunc {
+func setupGetSensorEventHandler(ws *WebSocketHandler, me *MetricsExporter) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		id, err := strconv.ParseInt(ctx.Param("sensor_id"), 10, 64)
 		if err != nil {
@@ -154,8 +142,9 @@ func setupGetSensorEventHandler(ws *WebSocketHandler, wm *WebsocketMetric) gin.H
 			return
 		}
 
-		wm.addConnection()
-		defer wm.removeConnection()
+		var gauge = me.activeWebsockets.WithLabelValues(ctx.FullPath())
+		gauge.Inc()
+		defer gauge.Dec()
 
 		if err := ws.Handle(ctx, id); err != nil {
 			if errors.Is(err, usecase.ErrSensorNotFound) {
