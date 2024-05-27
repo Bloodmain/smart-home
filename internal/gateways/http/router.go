@@ -24,6 +24,8 @@ import (
 	"github.com/jeanfric/goembed/countingwriter"
 )
 
+var metrics = newMetricsExporter()
+
 type MetricsExporter struct {
 	// red metrics
 	totalRequests   *prometheus.CounterVec
@@ -111,10 +113,9 @@ func readWriteMetrics(me *MetricsExporter) gin.HandlerFunc {
 
 func setupRouter(r *gin.Engine, uc UseCases, ws *WebSocketHandler) {
 	r.HandleMethodNotAllowed = true
-	me := newMetricsExporter()
 
-	r.Use(redMetricsHandler(me))
-	r.Use(readWriteMetrics(me))
+	r.Use(redMetricsHandler(metrics))
+	r.Use(readWriteMetrics(metrics))
 
 	r.POST("/events", setupPostEventHandler(uc))
 	r.OPTIONS("/events", setupOptionsEventHandler())
@@ -131,7 +132,7 @@ func setupRouter(r *gin.Engine, uc UseCases, ws *WebSocketHandler) {
 	r.HEAD("/users/:user_id/sensors", setupHeadUserIdHandler(uc))
 	r.OPTIONS("/users/:user_id/sensors", setupOptionsUserIdHandler())
 	r.GET("/users/:user_id/sensors", setupGetUserIdHandler(uc))
-	r.GET("/sensors/:sensor_id/events", setupGetSensorEventHandler(ws, me))
+	r.GET("/sensors/:sensor_id/events", setupGetSensorEventHandler(ws, metrics))
 	r.GET("/sensors/:sensor_id/history", setupGetSensorHistory(uc))
 }
 
