@@ -56,12 +56,9 @@ func main() {
 	}
 	portRaw, present := os.LookupEnv("HTTP_PORT")
 	port, err := strconv.Atoi(portRaw)
-	if !present {
+	if !present || err != nil || port < 0 || port > 9999 {
+		log.Printf("Valid port number hasn't been provided, using default port")
 		port = httpGateway.DefaultPort
-	}
-	if err != nil || port < 0 || port > 9999 {
-		log.Fatalf("invalid port number: %s\n", portRaw)
-		return
 	}
 
 	if port == MetricsPort {

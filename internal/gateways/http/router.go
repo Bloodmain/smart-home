@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	"homework/internal/domain"
 	"homework/internal/gateways/http/models"
 	"homework/internal/usecase"
@@ -22,29 +24,48 @@ import (
 	"github.com/jeanfric/goembed/countingwriter"
 )
 
-func errorHandler() gin.HandlerFunc {
+type redMetrics struct {
+	totalRequests   *prometheus.CounterVec
+	requestDuration *prometheus.HistogramVec
+	requestsErrors  *prometheus.CounterVec
+}
+
+func newRedMetrics() *redMetrics {
+	metrics := &redMetrics{
+		totalRequests: promauto.NewCounterVec(prometheus.CounterOpts{
+			Name: "total_requests",
+			Help: "Counts all requests by path",
+		}, []string{"path"}),
+		requestDuration: promauto.NewHistogramVec(prometheus.HistogramOpts{
+			Name: "requests_duration",
+			Help: "Keeps track of the duration of requests grouped by request path",
+		}, []string{"path"}),
+		requestsErrors: promauto.NewCounterVec(prometheus.CounterOpts{
+			Name: "requests_errors",
+			Help: "Counts all errors by path",
+		}, []string{"path"}),
+	}
+
+	err := errors.Join(prometheus.Register(metrics.totalRequests),
+		prometheus.Register(metrics.requestDuration),
+		prometheus.Register(metrics.requestsErrors))
+	if err != nil {
+		log.Printf("Cant register metrics: %v", err)
+	}
+
+	return metrics
+}
+
+func redMetricsHandler(metrics *redMetrics) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		t := prometheus.NewTimer(metrics.requestDuration.WithLabelValues(c.FullPath()))
 		c.Next()
-		for _, err := range c.Errors {
-			// Can instead store in a database or whatever
-			log.Printf("Error: %v", err)
+		t.ObserveDuration()
+
+		metrics.totalRequests.WithLabelValues(c.FullPath()).Inc()
+		for range c.Errors {
+			metrics.requestsErrors.WithLabelValues(c.FullPath()).Inc()
 		}
-	}
-}
-
-func occurrenceHandler() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		log.Printf("Request accepted")
-		c.Next()
-	}
-}
-
-func latencyHandler() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		t := time.Now()
-		c.Next()
-		latency := time.Since(t)
-		log.Printf("Latency: %v", latency)
 	}
 }
 
@@ -99,7 +120,8 @@ func readWriteMetrics(rwm *ReadWriteMetric) gin.HandlerFunc {
 
 func setupRouter(r *gin.Engine, uc UseCases, ws *WebSocketHandler) {
 	r.HandleMethodNotAllowed = true
-	r.Use(errorHandler(), occurrenceHandler(), latencyHandler())
+	rm := newRedMetrics()
+	r.Use(redMetricsHandler(rm))
 
 	wm := &WebsocketMetric{}
 	rwm := &ReadWriteMetric{}
