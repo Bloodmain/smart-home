@@ -57,3 +57,10 @@
 
 # Команда кодогенерации
 go-swagger.swagger generate model -f ../../../api/swagger.yaml
+
+# Сборка приложения
+
+1. Сбилдить приложение с помощью ```make controller-build```
+2. Запустить базу данных с помощью ```docker compose up -d```
+3. Сделать миграции с помощью ```make migrate-up```
+4. Запустить приложение с помощью ```make controller-run```

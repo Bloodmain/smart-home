@@ -8,10 +8,15 @@ import (
 	"homework/internal/gateways/http/models"
 	"homework/internal/usecase"
 	"io"
+	"log"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 
 	"github.com/go-openapi/strfmt"
 
@@ -19,8 +24,98 @@ import (
 	"github.com/jeanfric/goembed/countingwriter"
 )
 
+var metrics = newMetricsExporter()
+
+type MetricsExporter struct {
+	// red metrics
+	totalRequests   *prometheus.CounterVec
+	requestDuration *prometheus.HistogramVec
+	requestsErrors  *prometheus.CounterVec
+
+	// websocket metrics
+	activeWebsockets *prometheus.GaugeVec
+
+	// read/write metrics
+	totalReads  *prometheus.CounterVec
+	totalWrites *prometheus.CounterVec
+}
+
+func newMetricsExporter() *MetricsExporter {
+	metrics := &MetricsExporter{
+		totalRequests: promauto.NewCounterVec(prometheus.CounterOpts{
+			Name: "total_requests",
+			Help: "Counts all requests by path",
+		}, []string{"path"}),
+		requestDuration: promauto.NewHistogramVec(prometheus.HistogramOpts{
+			Name: "requests_duration",
+			Help: "Keeps track of the duration of requests grouped by request path",
+		}, []string{"path"}),
+		requestsErrors: promauto.NewCounterVec(prometheus.CounterOpts{
+			Name: "requests_errors",
+			Help: "Counts all errors by path",
+		}, []string{"path"}),
+
+		activeWebsockets: promauto.NewGaugeVec(prometheus.GaugeOpts{
+			Name: "active_websockets",
+			Help: "Represents active websockets on the path",
+		}, []string{"path"}),
+
+		totalReads: promauto.NewCounterVec(prometheus.CounterOpts{
+			Name: "total_reads",
+			Help: "Counts all reads requests by path",
+		}, []string{"path"}),
+		totalWrites: promauto.NewCounterVec(prometheus.CounterOpts{
+			Name: "total_writes",
+			Help: "Counts all writes requests by path",
+		}, []string{"path"}),
+	}
+
+	err := errors.Join(
+		prometheus.Register(metrics.totalRequests),
+		prometheus.Register(metrics.requestDuration),
+		prometheus.Register(metrics.requestsErrors),
+		prometheus.Register(metrics.activeWebsockets),
+		prometheus.Register(metrics.totalReads),
+		prometheus.Register(metrics.totalWrites),
+	)
+	if err != nil {
+		log.Printf("Cant register metrics: %v", err)
+	}
+
+	return metrics
+}
+
+func redMetricsHandler(me *MetricsExporter) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		t := prometheus.NewTimer(me.requestDuration.WithLabelValues(c.FullPath()))
+		c.Next()
+		t.ObserveDuration()
+
+		me.totalRequests.WithLabelValues(c.FullPath()).Inc()
+		for range c.Errors {
+			me.requestsErrors.WithLabelValues(c.FullPath()).Inc()
+		}
+	}
+}
+
+func readWriteMetrics(me *MetricsExporter) gin.HandlerFunc {
+	writesMethods := []string{"POST", "PUT", "PATCH", "DELETE"}
+
+	return func(c *gin.Context) {
+		if slices.IndexFunc(writesMethods, func(arg string) bool { return arg == c.Request.Method }) >= 0 {
+			me.totalWrites.WithLabelValues(c.FullPath()).Inc()
+		} else {
+			me.totalReads.WithLabelValues(c.FullPath()).Inc()
+		}
+		c.Next()
+	}
+}
+
 func setupRouter(r *gin.Engine, uc UseCases, ws *WebSocketHandler) {
 	r.HandleMethodNotAllowed = true
+
+	r.Use(redMetricsHandler(metrics))
+	r.Use(readWriteMetrics(metrics))
 
 	r.POST("/events", setupPostEventHandler(uc))
 	r.OPTIONS("/events", setupOptionsEventHandler())
@@ -37,17 +132,21 @@ func setupRouter(r *gin.Engine, uc UseCases, ws *WebSocketHandler) {
 	r.HEAD("/users/:user_id/sensors", setupHeadUserIdHandler(uc))
 	r.OPTIONS("/users/:user_id/sensors", setupOptionsUserIdHandler())
 	r.GET("/users/:user_id/sensors", setupGetUserIdHandler(uc))
-	r.GET("/sensors/:sensor_id/events", setupGetSensorEventHandler(ws))
+	r.GET("/sensors/:sensor_id/events", setupGetSensorEventHandler(ws, metrics))
 	r.GET("/sensors/:sensor_id/history", setupGetSensorHistory(uc))
 }
 
-func setupGetSensorEventHandler(ws *WebSocketHandler) gin.HandlerFunc {
+func setupGetSensorEventHandler(ws *WebSocketHandler, me *MetricsExporter) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		id, err := strconv.ParseInt(ctx.Param("sensor_id"), 10, 64)
 		if err != nil {
 			ctx.AbortWithStatus(http.StatusUnprocessableEntity)
 			return
 		}
+
+		gauge := me.activeWebsockets.WithLabelValues(ctx.FullPath())
+		gauge.Inc()
+		defer gauge.Dec()
 
 		if err := ws.Handle(ctx, id); err != nil {
 			if errors.Is(err, usecase.ErrSensorNotFound) {
