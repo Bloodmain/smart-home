@@ -78,7 +78,8 @@ func (r *EventRepository) GetHistoryBySensorID(ctx context.Context, id int64, fr
 
 	v := tree.Values()
 	comparator := func(e interface{}, t time.Time) int {
-		return e.(domain.Event).Timestamp.Compare(t)
+		return e.(domain.Event).Timestamp.Compare(t) //nolint // the tree works with interface{}
+		// and we are sure that the elements have type domain.Event, because we store only them
 	}
 	lb, _ := slices.BinarySearchFunc(v, from, comparator)
 	rb, found := slices.BinarySearchFunc(v, to, comparator)
