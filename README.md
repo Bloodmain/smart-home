@@ -1,66 +1,16 @@
-# Домашнее задание №6: Контроллер умного дома
+# Smart home controller
 
-Начиная с лекции 6 все домашние задания выполняются в рамках проекта: "Контроллер умного дома".
-Каждая следующая работа является продолжением предыдущей либо будет использоваться в этом проекте.
+This is a repository for storing and processing smart-home sensors' events. We have different users and one-to many relationship between them and sensors. 
+Each sensor has its type, current state, etc. Finally, we receive and processes the events (for instance, when the temperature has changed). 
 
-Контроллер умного дома это сервис, который предоставляет интерфейс для мониторинга состояния систем дома.
-Он принимает информацию от датчиков, сохраняет ее, может отдать информацию по запросу.
-Мы умышленно упростили некоторую логику этого сервиса, например функционал контроллера ограничен только работой с датчиками двух типов:
-- `ContactClosure` - сухие контакты (датчик протечки, переключатель на замыкание или размыкание).
-  Обычно события приходят при изменении состоянии датчика. Например, при открытии двери или окна.
-- `ADC` - аналоговый вход (термометры, датчики уровней). Обычно события приходят при изменении показаний датчика.
-  Например, при изменении показаний датчика температуры или влажности.
+For storing the stuff, we have in-memory and postgres databases.
 
-## Задание
-Детали задания указаны на edu
+On the last layer we have a server that provides rest [api](api/swagger.yaml) for getting and posting events, sensors and users.
 
-## Как подтянуть изменения в форк
+Furthermore, all of that is packed in a docker container. 
 
-Обратите внимание, для того чтобы скачать спецификацию и тесты для следующих заданий, нужно подтянуть изменения из основного репозитория.
-Для этого:
-1. Замержите в свой main всю накопленную работу в своём форке и переключитесь на обновлённый main локально
-2. Если не настроен upstream, то сделайте ```git remote add upstream git@github.com:central-university-dev/2024-spring-go-course-lesson6.git``` или ```git remote add upstream https://github.com/central-university-dev/2024-spring-go-course-lesson6.git```
-3. Обновите upstream: ```git fetch upstream``` или ```git fetch --all```
-4. Подтяните изменения из upstream и ребазируйтесь на них: ```git rebase upstream/main```
-
-## Подготовка окружения
-
-1. Установить docker ([windows](https://docs.docker.com/desktop/install/windows-install/), [Mac](https://docs.docker.com/desktop/install/mac-install/), [Linux](https://docs.docker.com/desktop/install/linux-install/))
-    * Если установили не docker-desktop, а docker отдельно - необходимо установить [docker-compose](https://docs.docker.com/compose/install/)
-2. Установить [migrate](https://github.com/golang-migrate/migrate/blob/master/cmd/migrate/README.md)
-3. Базу данных можно развернуть с помощью docker-compose (файл в корне проекта). Для этого необходимо выполнить команду `docker-compose up -d`. После того, как она запустится, к ней можно подключаться - `postgres://postgres:postgres@127.0.0.1:5432/db`.
-4. Для миграции нужно выполнить команду `migrate -path=./migrations -database postgres://postgres:postgres@127.0.0.1:5432/db?sslmode=disable up`. Также к проекту приложен Makefile, с помощью которого тоже можно выполнить миграцию - `make migrate-up`.
-
-Если решили выполнить миграцию через Make (`make migrate-up`) на Windows - его нужно [установить](https://stackoverflow.com/questions/32127524/how-to-install-and-use-make-in-windows). В Mac и Linux установка не требуется.
-
-## Запуск приложения
-
-Для запуска приложения требуется [переменная окружения](https://gobyexample.com/environment-variables) `DATABASE_URL` - URL подключения к базе (`postgres://postgres:postgres@127.0.0.1:5432/db?sslmode=disable`).
-
-## Запуск тестов
-
-Тесты в процессе запуска используют docker. Убедитесь, что он у вас запущен.
-
-1. зайти в терминале в каталог с домашним заданием
-2. вызвать ```go test -v ./... -race```
-
-## Запуск линтера
-
-Для линтинга используется [golangci-lint](https://golangci-lint.run/).
-Инструкцию по установке можно найти [тут](https://golangci-lint.run/usage/install/).
-
-Для запуска линтера нужно выполнить команду `golangci-lint run` в корне проекта.
-Большую часть ошибок линтера можно поправить с использованием флага `--fix`.
-
-## Обратите внимание
-От того как вы выполните это задание зависит и то, как ваш проект будет продвигаться в дальнейшем. Если вы в чем-то сомневаетесь, то не стесняйтесь задавать вопросы.
-
-# Команда кодогенерации
-go-swagger.swagger generate model -f ../../../api/swagger.yaml
-
-# Сборка приложения
-
-1. Сбилдить приложение с помощью ```make controller-build```
-2. Запустить базу данных с помощью ```docker compose up -d```
-3. Сделать миграции с помощью ```make migrate-up```
-4. Запустить приложение с помощью ```make controller-run```
+# Build instructions
+1. Build an app via `make controller-build`
+2. Run database via `docker compose up -d`
+3. Make migrations via `make migrate-up`
+4. Run the app via `make controller-run`
